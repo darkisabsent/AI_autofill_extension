@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Options - AI Form Autofill</title>
+    <link rel="stylesheet" href="options.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>AI Form Autofill Options</h1>
+            <p>Configure your preferences and manage your profile</p>
+        </div>
+
+        <div class="content">
+            <!-- User Profile Section -->
+            <div class="section">
+                <h2>User Profile</h2>
+                <div id="profileSection">
+                    <div class="profile-section">
+                        <form id="profileForm">
+                            <!-- Required Personal Information -->
+                            <div class="section-title">Personal Information <span class="required">*</span></div>
+                            
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="firstName">First Name <span class="required">*</span></label>
+                                    <input type="text" id="firstName" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="lastName">Last Name <span class="required">*</span></label>
+                                    <input type="text" id="lastName" required>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="dateOfBirth">Date of Birth <span class="required">*</span></label>
+                                <input type="date" id="dateOfBirth" required>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="gender">Gender <span class="required">*</span></label>
+                                <select id="gender" required>
+                                    <option value="">Select</option>
+                                    <option value="Male">Male</option>
+                                    <option value="Female">Female</option>
+                                    <option value="Other">Other</option>
+                                    <option value="Prefer not to say">Prefer not to say</option>
+                                </select>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group custom-select">
+                                    <label for="phoneCountryCode">Country Code <span class="required">*</span></label>
+                                    <select id="phoneCountryCode" required>
+                                        <option value="">Select Code</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="phoneNumber">Phone Number <span class="required">*</span></label>
+                                    <input type="tel" id="phoneNumber" placeholder="e.g., 1234567890" required>
+                                </div>
+                            </div>
+
+                            <!-- Address Information -->
+                            <div class="form-group">
+                                <label for="address">Address <span class="required">*</span></label>
+                                <textarea id="address" placeholder="Enter your full address" required></textarea>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="city">City <span class="required">*</span></label>
+                                    <input type="text" id="city" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="postalCode">Postal Code <span class="required">*</span></label>
+                                    <input type="text" id="postalCode" required>
+                                </div>
+                            </div>
+
+                            <div class="form-group custom-select">
+                                <label for="country">Country <span class="required">*</span></label>
+                                <select id="country" required>
+                                    <option value="">Select a country</option>
+                                </select>
+                            </div>
+
+                            <!-- Optional Personal Information -->
+                            <div class="section-title">Additional Information</div>
+                            
+                            <div class="form-group">
+                                <label for="hobbies">Hobbies</label>
+                                <input type="text" id="hobbies" placeholder="E.g., Reading, Sports, Music">
+                            </div>
+
+                            <!-- Professional Links -->
+                            <div class="section-title">Professional Links</div>
+                            
+                            <div class="form-group">
+                                <label for="linkedinUrl">LinkedIn</label>
+                                <input type="url" id="linkedinUrl" placeholder="https://linkedin.com/in/your-profile">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="githubUrl">GitHub</label>
+                                <input type="url" id="githubUrl" placeholder="https://github.com/your-username">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="portfolioUrl">Portfolio</label>
+                                <input type="url" id="portfolioUrl" placeholder="https://your-portfolio.com">
+                            </div>
+
+                            <!-- Academic Section -->
+                            <div class="section-title">
+                                <span>Academic Information</span>
+                                <button type="button" id="toggleAcademicBtn" class="toggle-btn">Show/Hide</button>
+                            </div>
+                            <div id="academicSection" class="collapsible-section hidden">
+                                <div class="form-group">
+                                    <label for="academicDegree">Degree</label>
+                                    <input type="text" id="academicDegree" placeholder="E.g., Bachelor's in Computer Science">
+                                </div>
+                                <div class="form-group">
+                                    <label for="academicInstitution">Institution</label>
+                                    <input type="text" id="academicInstitution" placeholder="E.g., Harvard University">
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="academicGraduationYear">Graduation Year</label>
+                                        <input type="number" id="academicGraduationYear" min="1950" max="2030" placeholder="E.g., 2020">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="academicFieldOfStudy">Field of Study</label>
+                                        <input type="text" id="academicFieldOfStudy" placeholder="E.g., Computer Science">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Professional Section -->
+                            <div class="section-title">
+                                <span>Professional Information</span>
+                                <button type="button" id="toggleProfessionalBtn" class="toggle-btn">Show/Hide</button>
+                            </div>
+                            <div id="professionalSection" class="collapsible-section hidden">
+                                <div class="form-group">
+                                    <label for="professionalJobTitle">Current Job Title</label>
+                                    <input type="text" id="professionalJobTitle" placeholder="E.g., Software Engineer">
+                                </div>
+                                <div class="form-group">
+                                    <label for="professionalCompanyName">Company Name</label>
+                                    <input type="text" id="professionalCompanyName" placeholder="E.g., Google">
+                                </div>
+                                <div class="form-group">
+                                    <label for="professionalYearsOfExperience">Years of Experience</label>
+                                    <input type="number" id="professionalYearsOfExperience" min="0" max="50" placeholder="E.g., 5">
+                                </div>
+                                <div class="form-group">
+                                    <label for="professionalSkills">Skills</label>
+                                    <textarea id="professionalSkills" placeholder="E.g., JavaScript, Python, UI/UX Design"></textarea>
+                                </div>
+                            </div>
+
+                            <!-- Startup Section -->
+                            <div class="section-title">
+                                <span>Startup Project</span>
+                                <button type="button" id="toggleStartupBtn" class="toggle-btn">Show/Hide</button>
+                            </div>
+                            <div id="startupSection" class="collapsible-section hidden">
+                                <div class="form-group">
+                                    <label for="startupProjectName">Project Name</label>
+                                    <input type="text" id="startupProjectName" placeholder="E.g., TechInnovate">
+                                </div>
+                                <div class="form-group">
+                                    <label for="startupSummary">Summary</label>
+                                    <textarea id="startupSummary" placeholder="Brief description of your startup project"></textarea>
+                                </div>
+                                <div class="form-group">
+                                    <label for="startupMission">Mission</label>
+                                    <textarea id="startupMission" placeholder="What is your startup's mission?"></textarea>
+                                </div>
+                                <div class="form-group">
+                                    <label for="startupProblemStatement">Problem Statement</label>
+                                    <textarea id="startupProblemStatement" placeholder="What problem are you solving?"></textarea>
+                                </div>
+                                <div class="form-group">
+                                    <label for="startupSolution">Solution</label>
+                                    <textarea id="startupSolution" placeholder="How does your startup solve this problem?"></textarea>
+                                </div>
+                                <div class="form-group">
+                                    <label for="startupImpact">Impact</label>
+                                    <textarea id="startupImpact" placeholder="What impact do you hope to achieve?"></textarea>
+                                </div>
+                                <div class="form-group">
+                                    <label for="startupTeamMembers">Team Members</label>
+                                    <textarea id="startupTeamMembers" placeholder="E.g., John Doe (CEO), Jane Smith (CTO)"></textarea>
+                                </div>
+                                <div class="form-group">
+                                    <label for="startupVideoUrl">Video URL</label>
+                                    <input type="url" id="startupVideoUrl" placeholder="https://youtube.com/watch?v=example">
+                                </div>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary">Save Profile</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Preferences Section -->
+            <div class="section">
+                <h2>Preferences</h2>
+                <form id="preferencesForm">
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="autoDetect" name="auto_detect" checked>
+                        <label for="autoDetect">Automatically detect forms</label>
+                    </div>
+
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="showNotifications" name="show_notifications" checked>
+                        <label for="showNotifications">Show notifications</label>
+                    </div>
+
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="saveHistory" name="save_history" checked>
+                        <label for="saveHistory">Save form history</label>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="apiUrl">API URL (for development)</label>
+                        <input type="url" id="apiUrl" name="api_url" value="http://localhost:5000/api">
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">Save Preferences</button>
+                </form>
+            </div>
+
+            <!-- Messages -->
+            <div id="successMessage" class="success-message hidden"></div>
+            <div id="errorMessage" class="error-message hidden"></div>
+        </div>
+    </div>
+
+    <script src="options.js"></script>
+</body>
+</html>
+

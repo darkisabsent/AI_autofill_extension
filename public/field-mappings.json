@@ -1,0 +1,74 @@
+{
+  "email": [
+    "email", "e-mail", "mail", "correo", "courriel", "電子メール", "البريد الإلكتروني", "email_address", "emailaddress", "user_email"
+  ],
+  "firstName": [
+    "firstname", "first_name", "prénom", "prenom", "nombre", "名", "الاسم الأول", "first", "fname", "given_name", "given-name", "first-name"
+  ],
+  "lastName": [
+    "lastname", "last_name", "nom de famille", "apellido", "姓", "اسم العائلة", "last", "lname", "family_name", "surname", "family-name", "last-name", "nom"
+  ],
+  "fullName": [
+    "fullname", "full_name", "nom_complet", "nombre_completo", "氏名", "الاسم الكامل", "complete_name", "customer_name"
+  ],
+  "phone": [
+    "phone", "telephone", "tel", "mobile", "phonenumber", "phone_number", "número_teléfono", "téléphone", "电话", "رقم الهاتف", "cell", "cellular", "tel-number", "tel_number", "mobile_number"
+  ],
+  "address": [
+    "address", "adresse", "street", "dirección", "住所", "العنوان", "rue", "calle", "street_address", "addr", "address1", "address_line_1", "address-line-1", "street1", "address_line1"
+  ],
+  "city": [
+    "city", "ville", "ciudad", "市", "المدينة", "localidad", "locality", "town"
+  ],
+  "country": [
+    "country", "pays", "país", "国", "البلد", "nation", "pais", "country_code", "country-code"
+  ],
+  "postalCode": [
+    "postal", "zip", "zipcode", "postal_code", "code_postal", "código_postal", "郵便番号", "الرمز البريدي", "postcode", "cp", "zip_code", "postal-code"
+  ],
+  "dateOfBirth": [
+    "birth", "birthday", "date_birth", "naissance", "fecha_nacimiento", "生年月日", "تاريخ الميلاد", "birthdate", "dob", "date_of_birth", "birth_date", "date-of-birth"
+  ],
+  "gender": [
+    "gender", "sexe", "género", "性別", "الجنس", "sex", "genero", "sexo"
+  ],
+  "hobbies": [
+    "hobbies", "interests", "loisirs", "pasatiempos", "趣味", "الهوايات", "aficiones", "hobby", "passions"
+  ],
+  "professionalCompanyName": [
+    "company", "entreprise", "organization", "empresa", "会社", "الشركة", "employer", "workplace", "org", "company_name", "company-name", "organization_name"
+  ],
+  "professionalJobTitle": [
+    "job", "title", "position", "poste", "trabajo", "職業", "المسمى الوظيفي", "role", "occupation", "job_title", "jobtitle", "job-title"
+  ],
+  "professionalSkills": [
+    "skills", "competences", "habilidades", "スキル", "المهارات", "competencias", "abilities", "expertise", "proficiencies"
+  ],
+  "professionalYearsOfExperience": [
+    "experience", "experiencia", "expérience", "経験", "الخبرة", "years_experience", "work_experience", "years-of-experience", "years_of_experience"
+  ],
+  "academicDegree": [
+    "degree", "diplome", "education", "título", "学位", "الدرجة العلمية", "qualification", "diploma", "education_level"
+  ],
+  "academicInstitution": [
+    "school", "university", "universite", "universidad", "大学", "الجامعة", "institution", "college", "institute", "school_name", "university_name"
+  ],
+  "academicFieldOfStudy": [
+    "study", "field_study", "domaine", "campo_estudio", "専攻", "مجال الدراسة", "major", "subject", "specialization", "field-of-study", "area_of_study", "fieldstudy", "fieldofstudy", "field_of_study"
+  ],
+  "academicGraduationYear": [
+    "graduation", "graduación", "卒業年", "سنة التخرج", "grad_year", "year_graduated", "graduation_year", "graduation-year"
+  ],
+  "linkedinUrl": [
+    "linkedin", "linkedin_url", "linkedin_profile", "linkedin-url", "linkedin-profile", "linkedinprofile"
+  ],
+  "githubUrl": [
+    "github", "github_url", "github_profile", "github-url", "github-profile", "githubprofile"
+  ],
+  "portfolioUrl": [
+    "portfolio", "website", "sitio_web", "ウェブサイト", "الموقع الإلكتروني", "personal_website", "portfolio_url", "portfolio-url"
+  ],
+  "username": [
+    "username", "login", "user", "usuario", "ユーザー名", "اسم المستخدم", "user_name", "nick", "nickname", "user-name", "user_id", "userid"
+  ]
+}
