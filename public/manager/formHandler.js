@@ -26,10 +26,45 @@ export async function detectForms(instance) {
 export function displayDetectedForms(instance, forms) {
     const container = document.getElementById('formsContainer');
     container.innerHTML = '';
+    
     if (forms.length === 0) {
-        container.innerHTML = '<p style="color: #666; font-size: 13px;">Aucun formulaire détecté.</p>';
+        container.innerHTML = `
+            <div style="text-align: center; padding: 20px; color: #666;">
+                <p style="margin: 0 0 10px 0; font-size: 13px;">Aucun formulaire détecté sur cette page.</p>
+                <button id="refreshFormsBtn" style="
+                    background: #f0f0f0; 
+                    border: 1px solid #ddd; 
+                    padding: 6px 12px; 
+                    border-radius: 4px; 
+                    cursor: pointer;
+                    font-size: 12px;
+                ">🔄 Actualiser la détection</button>
+            </div>
+        `;
+        
+        document.getElementById('refreshFormsBtn').addEventListener('click', () => {
+            detectForms(instance);
+        });
         return;
     }
+    
+    // Ajouter un en-tête indiquant le nombre de formulaires détectés
+    const header = document.createElement('div');
+    header.style.cssText = `
+        background: #f8f9fa;
+        padding: 8px 12px;
+        border-radius: 6px;
+        margin-bottom: 12px;
+        font-size: 13px;
+        color: #495057;
+        border: 1px solid #e9ecef;
+    `;
+    header.innerHTML = `
+        <strong>📋 ${forms.length} formulaire${forms.length > 1 ? 's' : ''} détecté${forms.length > 1 ? 's' : ''}</strong>
+        <span style="float: right; color: #6c757d; font-size: 11px;">Prêt à remplir</span>
+    `;
+    container.appendChild(header);
+    
     forms.forEach((form, index) => {
         const formElement = document.createElement('div');
         formElement.className = 'form-item';
@@ -57,8 +92,17 @@ export function displayDetectedForms(instance, forms) {
                     `).join('')}
                 </div>
             </details>
-            <button class="btn btn-primary" id="fillFormBtn-${index}" style="margin-top: 8px;">
-                Remplir automatiquement
+            <button class="btn btn-primary" id="fillFormBtn-${index}" style="
+                margin-top: 8px;
+                background: #007bff;
+                color: white;
+                border: none;
+                padding: 8px 16px;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 13px;
+            ">
+                🚀 Remplir automatiquement le formulaire
             </button>
         `;
         container.appendChild(formElement);
@@ -73,35 +117,118 @@ export async function fillForm(instance, formIndex) {
     if (!instance.detectedForms[formIndex]) {
         return;
     }
+    
     try {
+        // Show overlay immediately
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        await chrome.tabs.sendMessage(tab.id, { action: 'showFillingOverlay' });
+        
+        // Get user profile
         const storage = await new Promise(resolve =>
             chrome.storage.local.get(['currentUser'], resolve)
         );
         if (!storage.currentUser || !storage.currentUser.profile) {
+            await chrome.tabs.sendMessage(tab.id, { action: 'hideFillingOverlay' });
             displayMessage('Erreur: Profil utilisateur non trouvé');
             return;
         }
+        
         const userProfile = storage.currentUser;
         const formData = instance.detectedForms[formIndex];
+        
+        await chrome.tabs.sendMessage(tab.id, { 
+            action: 'updateFillingProgress', 
+            status: 'Analyzing form fields...' 
+        });
+        
+        // Analyze fields first
         const allSuggestions = generateFieldSuggestions(formData.fields, userProfile, instance.fieldMappings);
         const { matchedFields, aiRelevantFields, missingProfileFields } =
             separateMatchedFields(allSuggestions, formData.fields, (field) => isOpenEndedQuestion(field));
+        
+        console.log(`Form ${formIndex + 1}: ${matchedFields.length} profile matches, ${aiRelevantFields.length} AI fields`);
+        
+        // Start AI request immediately if we have AI fields (DON'T WAIT FOR IT)
+        let aiPromise = null;
+        let aiTimeoutId = null;
+        let aiCompleted = false;
+        
+        if (aiRelevantFields.length > 0) {
+            console.log('🚀 Starting AI request in parallel...');
+            await chrome.tabs.sendMessage(tab.id, { 
+                action: 'updateFillingProgress', 
+                status: `Starting AI request for ${aiRelevantFields.length} fields...` 
+            });
+            
+            displayMessage(`🤖 IA démarrée pour ${aiRelevantFields.length} champ(s)...`);
+            
+            // Start AI request without awaiting
+            aiPromise = getAISuggestions(instance, userProfile, aiRelevantFields);
+        }
+        
+        // Fill profile fields while AI is processing
         if (matchedFields.length > 0) {
-            const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+            await chrome.tabs.sendMessage(tab.id, { 
+                action: 'updateFillingProgress', 
+                status: `Filling ${matchedFields.length} profile fields...` 
+            });
+            
             await chrome.tabs.sendMessage(tab.id, {
                 action: 'fillForm',
                 formIndex: formIndex,
                 suggestions: matchedFields,
-                userId: userProfile.id
+                userId: userProfile.id,
+                isAIFilling: false
             });
-            displayMessage(`✅ ${matchedFields.length} champs remplis avec les données du profil`);
+            
+            // Wait for profile filling to complete
+            await new Promise(resolve => setTimeout(resolve, (matchedFields.length * 300) + 500));
+            
+            displayMessage(`✅ ${matchedFields.length} champs profil remplis`);
         }
-        if (aiRelevantFields.length > 0) {
-            displayMessage(`🤖 Génération de suggestions IA pour ${aiRelevantFields.length} champ(s)...`);
+        
+        // Now handle AI results if we have them
+        if (aiRelevantFields.length > 0 && aiPromise) {
+            await chrome.tabs.sendMessage(tab.id, { 
+                action: 'updateFillingProgress', 
+                status: 'Waiting for AI response (max 7s)...' 
+            });
+            
             try {
-                const aiSuggestions = await getAISuggestions(instance, userProfile, aiRelevantFields);
+                console.log('⏳ Waiting for AI response...');
+                
+                // Create a timeout promise that we can cancel
+                const timeoutPromise = new Promise((_, reject) => {
+                    aiTimeoutId = setTimeout(() => {
+                        if (!aiCompleted) {
+                            console.log('❌ AI timeout after 7 seconds');
+                            reject(new Error('AI timeout after 7 seconds'));
+                        }
+                    }, 7000);
+                });
+                
+                // Race between AI response and timeout
+                const aiSuggestions = await Promise.race([
+                    aiPromise.then(result => {
+                        aiCompleted = true; // Mark as completed before timeout fires
+                        if (aiTimeoutId) {
+                            clearTimeout(aiTimeoutId);
+                            aiTimeoutId = null;
+                        }
+                        return result;
+                    }),
+                    timeoutPromise
+                ]);
+                
+                console.log('✅ AI response received:', aiSuggestions);
+                
                 if (aiSuggestions && aiSuggestions.length > 0) {
-                    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+                    await chrome.tabs.sendMessage(tab.id, { 
+                        action: 'updateFillingProgress', 
+                        status: `Applying ${aiSuggestions.length} AI suggestions...` 
+                    });
+                    
+                    // Fill AI suggestions
                     await chrome.tabs.sendMessage(tab.id, {
                         action: 'fillForm',
                         formIndex: formIndex,
@@ -109,37 +236,54 @@ export async function fillForm(instance, formIndex) {
                         userId: userProfile.id,
                         isAIFilling: true
                     });
+                    
+                    // Wait for AI filling to complete before hiding overlay
+                    await new Promise(resolve => setTimeout(resolve, (aiSuggestions.length * 300) + 1000));
+                    
                     const totalFilled = matchedFields.length + aiSuggestions.length;
-                    displayMessage(`🎉 Remplissage terminé: ${totalFilled} champs (${matchedFields.length} profil + ${aiSuggestions.length} IA)`);
+                    displayMessage(`🎉 Terminé: ${totalFilled} champs (${matchedFields.length} profil + ${aiSuggestions.length} IA)`);
                 } else {
-                    if (matchedFields.length > 0) {
-                        displayMessage(`✅ ${matchedFields.length} champs remplis avec les données du profil (IA non disponible)`);
-                    } else {
-                        displayMessage('❌ Aucune suggestion IA générée');
-                    }
+                    displayMessage(matchedFields.length > 0 
+                        ? `✅ ${matchedFields.length} champs remplis (IA sans réponse)`
+                        : '❌ Aucune suggestion IA générée');
                 }
+                
             } catch (aiError) {
-                if (matchedFields.length > 0) {
-                    displayMessage(`✅ ${matchedFields.length} champs remplis avec les données du profil (IA indisponible)`);
+                console.error('AI Error:', aiError);
+                
+                // Clear timeout if it exists
+                if (aiTimeoutId) {
+                    clearTimeout(aiTimeoutId);
+                    aiTimeoutId = null;
+                }
+                
+                if (aiError.message.includes('timeout')) {
+                    displayMessage(matchedFields.length > 0 
+                        ? `⏱️ IA timeout (7s) - ${matchedFields.length} champs profil OK`
+                        : '⏱️ IA timeout (7s) - Aucun champ rempli');
                 } else {
-                    displayMessage('❌ IA indisponible et aucun champ correspondant dans le profil');
+                    displayMessage(matchedFields.length > 0 
+                        ? `✅ ${matchedFields.length} champs profil (IA indisponible)`
+                        : '❌ IA indisponible');
                 }
             }
-        } else {
-            if (matchedFields.length === 0) {
-                let message = 'Aucun champ correspondant trouvé pour le remplissage automatique';
-                if (missingProfileFields.length > 0) {
-                    message += '. Certains champs nécessitent des informations manquantes dans votre profil.';
-                }
-                displayMessage(message);
-            } else {
-                displayMessage(`✅ ${matchedFields.length} champs remplis avec les données du profil`);
-            }
+        } else if (matchedFields.length === 0) {
+            displayMessage('Aucun champ correspondant trouvé');
         }
-        if (missingProfileFields.length > 0) {
-            const skippedFieldNames = missingProfileFields.map(f => f.field_info.label || f.field_name).join(', ');
-        }
+        
+        // Always hide overlay at the end
+        await chrome.tabs.sendMessage(tab.id, { action: 'hideFillingOverlay' });
+        
     } catch (error) {
-        displayMessage('❌ Erreur lors du remplissage automatique');
+        console.error('Form filling error:', error);
+        
+        try {
+            const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+            await chrome.tabs.sendMessage(tab.id, { action: 'hideFillingOverlay' });
+        } catch (e) {
+            console.error('Error hiding overlay on error:', e);
+        }
+        
+        displayMessage('❌ Erreur lors du remplissage');
     }
 }

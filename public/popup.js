@@ -18,7 +18,7 @@ class PopupManager {
         this.detectedForms = [];
         this.countries = [];
         this.fieldMappings = FIELD_MAPPINGS;
-        this.AI_SERVER_URL = 'http://127.0.0.1:5000/api/analyze'; 
+        this.AI_SERVER_URL = 'http://127.0.0.1:5001/api/analyze'; 
         this.init();
     }
 
@@ -62,6 +62,8 @@ class PopupManager {
                             this.updateProfileProgress();
                         } else {
                             showUserSection(this.currentUser);
+                            // Automatically load detected forms
+                            this.loadDetectedForms();
                         }
                     } else {
                         await chrome.storage.local.remove(['accessToken']);
@@ -147,9 +149,7 @@ class PopupManager {
         document.getElementById('toggleStartupSectionBtn').addEventListener('click', () => {
             toggleSection('startup');
         });
-        document.getElementById('detectFormsBtn').addEventListener('click', () => {
-            this.detectForms();
-        });
+        // Remove detect forms button listener since we auto-load
         document.getElementById('loginTabBtn').addEventListener('click', () => {
             showTab('login');
         });
@@ -293,6 +293,24 @@ class PopupManager {
                 }
             });
         });
+    }
+
+    async loadDetectedForms() {
+        try {
+            const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+            const response = await chrome.tabs.sendMessage(tab.id, { action: 'getDetectedForms' });
+            
+            if (response && response.forms && response.forms.length > 0) {
+                this.displayDetectedForms(response.forms);
+            } else {
+                // If no cached forms, show a message or refresh detection
+                const container = document.getElementById('formsContainer');
+                container.innerHTML = '<p style="color: #666; font-size: 13px; text-align: center; padding: 20px;">No forms detected on this page.</p>';
+            }
+        } catch (error) {
+            const container = document.getElementById('formsContainer');
+            container.innerHTML = '<p style="color: #999; font-size: 13px; text-align: center; padding: 20px;">Unable to detect forms. Please refresh the page.</p>';
+        }
     }
 }
 
