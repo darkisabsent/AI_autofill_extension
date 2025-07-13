@@ -203,7 +203,7 @@ export function generateFieldSuggestions(fields, userProfile, fieldMappings) {
             if (valueGetters[profileField]) {
                 for (const identifier of fieldIdentifiers) {
                     for (const keyword of keywords) {
-                        if (identifier.includes(keyword.toLowerCase())) {
+                        if (identifier === keyword.toLowerCase()) {
                             const value = valueGetters[profileField]();
                             if (value && value.toString().trim() !== '') {
                                 suggestedValue = value;
@@ -212,14 +212,13 @@ export function generateFieldSuggestions(fields, userProfile, fieldMappings) {
                             }
                         }
                     }
-                    if (suggestedValue) break;
+                    if (matchedField) break;
                 }
-                if (suggestedValue) break;
             }
         }
 
         suggestions.push({
-            field_name: field.name,
+            field_name: field.field_name,
             suggested_value: suggestedValue,
             field_info: field,
             matched_profile_field: matchedField
