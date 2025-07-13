@@ -117,173 +117,90 @@ export async function fillForm(instance, formIndex) {
     if (!instance.detectedForms[formIndex]) {
         return;
     }
-    
+    let overlay = null;
     try {
-        // Show overlay immediately
-        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-        await chrome.tabs.sendMessage(tab.id, { action: 'showFillingOverlay' });
-        
         // Get user profile
         const storage = await new Promise(resolve =>
             chrome.storage.local.get(['currentUser'], resolve)
         );
         if (!storage.currentUser || !storage.currentUser.profile) {
-            await chrome.tabs.sendMessage(tab.id, { action: 'hideFillingOverlay' });
             displayMessage('Erreur: Profil utilisateur non trouvé');
             return;
         }
-        
         const userProfile = storage.currentUser;
         const formData = instance.detectedForms[formIndex];
-        
-        await chrome.tabs.sendMessage(tab.id, { 
-            action: 'updateFillingProgress', 
-            status: 'Analyzing form fields...' 
-        });
-        
         // Analyze fields first
         const allSuggestions = generateFieldSuggestions(formData.fields, userProfile, instance.fieldMappings);
-        const { matchedFields, aiRelevantFields, missingProfileFields } =
-            separateMatchedFields(allSuggestions, formData.fields, (field) => isOpenEndedQuestion(field));
-        
-        console.log(`Form ${formIndex + 1}: ${matchedFields.length} profile matches, ${aiRelevantFields.length} AI fields`);
-        
-        // Start AI request immediately if we have AI fields (DON'T WAIT FOR IT)
-        let aiPromise = null;
-        let aiTimeoutId = null;
-        let aiCompleted = false;
-        
-        if (aiRelevantFields.length > 0) {
-            console.log('🚀 Starting AI request in parallel...');
-            await chrome.tabs.sendMessage(tab.id, { 
-                action: 'updateFillingProgress', 
-                status: `Starting AI request for ${aiRelevantFields.length} fields...` 
-            });
-            
-            displayMessage(`🤖 IA démarrée pour ${aiRelevantFields.length} champ(s)...`);
-            
-            // Start AI request without awaiting
-            aiPromise = getAISuggestions(instance, userProfile, aiRelevantFields);
-        }
-        
-        // Fill profile fields while AI is processing
-        if (matchedFields.length > 0) {
-            await chrome.tabs.sendMessage(tab.id, { 
-                action: 'updateFillingProgress', 
-                status: `Filling ${matchedFields.length} profile fields...` 
-            });
-            
-            await chrome.tabs.sendMessage(tab.id, {
-                action: 'fillForm',
-                formIndex: formIndex,
-                suggestions: matchedFields,
-                userId: userProfile.id,
-                isAIFilling: false
-            });
-            
-            // Wait for profile filling to complete
-            await new Promise(resolve => setTimeout(resolve, (matchedFields.length * 300) + 500));
-            
-            displayMessage(`✅ ${matchedFields.length} champs profil remplis`);
-        }
-        
-        // Now handle AI results if we have them
-        if (aiRelevantFields.length > 0 && aiPromise) {
-            await chrome.tabs.sendMessage(tab.id, { 
-                action: 'updateFillingProgress', 
-                status: 'Waiting for AI response (max 7s)...' 
-            });
-            
-            try {
-                console.log('⏳ Waiting for AI response...');
-                
-                // Create a timeout promise that we can cancel
-                const timeoutPromise = new Promise((_, reject) => {
-                    aiTimeoutId = setTimeout(() => {
-                        if (!aiCompleted) {
-                            console.log('❌ AI timeout after 7 seconds');
-                            reject(new Error('AI timeout after 7 seconds'));
-                        }
-                    }, 7000);
-                });
-                
-                // Race between AI response and timeout
-                const aiSuggestions = await Promise.race([
-                    aiPromise.then(result => {
-                        aiCompleted = true; // Mark as completed before timeout fires
-                        if (aiTimeoutId) {
-                            clearTimeout(aiTimeoutId);
-                            aiTimeoutId = null;
-                        }
-                        return result;
-                    }),
-                    timeoutPromise
-                ]);
-                
-                console.log('✅ AI response received:', aiSuggestions);
-                
-                if (aiSuggestions && aiSuggestions.length > 0) {
-                    await chrome.tabs.sendMessage(tab.id, { 
-                        action: 'updateFillingProgress', 
-                        status: `Applying ${aiSuggestions.length} AI suggestions...` 
-                    });
-                    
-                    // Fill AI suggestions
-                    await chrome.tabs.sendMessage(tab.id, {
-                        action: 'fillForm',
-                        formIndex: formIndex,
-                        suggestions: aiSuggestions,
-                        userId: userProfile.id,
-                        isAIFilling: true
-                    });
-                    
-                    // Wait for AI filling to complete before hiding overlay
-                    await new Promise(resolve => setTimeout(resolve, (aiSuggestions.length * 300) + 1000));
-                    
-                    const totalFilled = matchedFields.length + aiSuggestions.length;
-                    displayMessage(`🎉 Terminé: ${totalFilled} champs (${matchedFields.length} profil + ${aiSuggestions.length} IA)`);
-                } else {
-                    displayMessage(matchedFields.length > 0 
-                        ? `✅ ${matchedFields.length} champs remplis (IA sans réponse)`
-                        : '❌ Aucune suggestion IA générée');
-                }
-                
-            } catch (aiError) {
-                console.error('AI Error:', aiError);
-                
-                // Clear timeout if it exists
-                if (aiTimeoutId) {
-                    clearTimeout(aiTimeoutId);
-                    aiTimeoutId = null;
-                }
-                
-                if (aiError.message.includes('timeout')) {
-                    displayMessage(matchedFields.length > 0 
-                        ? `⏱️ IA timeout (7s) - ${matchedFields.length} champs profil OK`
-                        : '⏱️ IA timeout (7s) - Aucun champ rempli');
-                } else {
-                    displayMessage(matchedFields.length > 0 
-                        ? `✅ ${matchedFields.length} champs profil (IA indisponible)`
-                        : '❌ IA indisponible');
-                }
-            }
-        } else if (matchedFields.length === 0) {
+        const { matchedFields } = separateMatchedFields(allSuggestions, formData.fields, (field) => isOpenEndedQuestion(field));
+        if (!matchedFields.length) {
             displayMessage('Aucun champ correspondant trouvé');
+            return;
         }
-        
-        // Always hide overlay at the end
-        await chrome.tabs.sendMessage(tab.id, { action: 'hideFillingOverlay' });
-        
+        // Show overlay
+        showOverlay(matchedFields.length);
+        console.log('Overlay shown');
+        // Fill profile fields one by one
+        for (let i = 0; i < matchedFields.length; i++) {
+            const field = matchedFields[i];
+            console.log(`✍️ Filling profile field ${i+1}/${matchedFields.length}:`, field.field_name);
+            try {
+                const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+                await chrome.tabs.sendMessage(tab.id, {
+                    action: 'fillForm',
+                    formIndex: formIndex,
+                    suggestions: [field],
+                    userId: userProfile.id,
+                    isAIFilling: false
+                });
+                console.log(`✅ Filled ${field.field_name} with:`, field.suggested_value);
+            } catch (err) {
+                console.warn(`❌ Failed to fill ${field.field_name}:`, err);
+            }
+            updateOverlayProgress(i + 1, matchedFields.length);
+            await new Promise(resolve => setTimeout(resolve, 300));
+        }
     } catch (error) {
         console.error('Form filling error:', error);
-        
-        try {
-            const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-            await chrome.tabs.sendMessage(tab.id, { action: 'hideFillingOverlay' });
-        } catch (e) {
-            console.error('Error hiding overlay on error:', e);
-        }
-        
         displayMessage('❌ Erreur lors du remplissage');
+    } finally {
+        hideOverlay();
+        console.log('Overlay hidden');
+    }
+}
+
+function showOverlay(totalFields) {
+    hideOverlay(); // Remove any existing overlay first
+    const overlay = document.createElement('div');
+    overlay.id = 'autofillOverlay';
+    overlay.style.cssText = `
+        position: fixed;
+        top: 0; left: 0; width: 100vw; height: 100vh;
+        background: rgba(0,0,0,0.5);
+        z-index: 999999;
+        display: flex; align-items: center; justify-content: center;
+    `;
+    overlay.innerHTML = `
+        <div style="background: #fff; padding: 32px 40px; border-radius: 10px; box-shadow: 0 8px 32px rgba(0,0,0,0.2); text-align: center; min-width: 320px;">
+            <h3 style="margin-bottom: 16px; color: #333;">Remplissage du profil...</h3>
+            <div id="autofillProgressBar" style="background: #eee; height: 8px; border-radius: 4px; overflow: hidden; margin-bottom: 12px;">
+                <div id="autofillProgress" style="background: linear-gradient(90deg,#4f46e5,#7c3aed); height: 100%; width: 0%; transition: width 0.3s;"></div>
+            </div>
+            <div id="autofillProgressText" style="font-size: 14px; color: #666;">0 / ${totalFields} champs</div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+}
+
+function updateOverlayProgress(current, total) {
+    const bar = document.getElementById('autofillProgress');
+    const text = document.getElementById('autofillProgressText');
+    if (bar) bar.style.width = `${Math.round((current/total)*100)}%`;
+    if (text) text.textContent = `${current} / ${total} champs`;
+}
+
+function hideOverlay() {
+    const overlay = document.getElementById('autofillOverlay');
+    if (overlay) {
+        overlay.remove();
     }
 }
