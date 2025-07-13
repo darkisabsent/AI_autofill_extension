@@ -234,66 +234,94 @@ function createFillingOverlay() {
     left: 0;
     width: 100vw;
     height: 100vh;
-    background: rgba(0, 0, 0, 0.7);
+    background: rgba(0, 0, 0, 0.85);
     z-index: 2147483647;
     display: flex;
     align-items: center;
     justify-content: center;
-    backdrop-filter: blur(2px);
+    backdrop-filter: blur(4px);
     font-family: system-ui, -apple-system, sans-serif;
+    pointer-events: all;
+    user-select: none;
   `;
 
   overlay.innerHTML = `
     <div style="
       background: white;
-      padding: 30px 40px;
-      border-radius: 12px;
-      box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+      padding: 40px;
+      border-radius: 16px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.4);
       text-align: center;
-      max-width: 400px;
+      max-width: 450px;
       position: relative;
+      min-width: 350px;
     ">
       <div style="
-        width: 50px;
-        height: 50px;
+        width: 60px;
+        height: 60px;
         border: 4px solid #f3f3f3;
         border-top: 4px solid #4f46e5;
         border-radius: 50%;
         animation: spin 1s linear infinite;
-        margin: 0 auto 20px auto;
+        margin: 0 auto 24px auto;
       "></div>
       <h3 style="
-        margin: 0 0 10px 0;
+        margin: 0 0 12px 0;
         color: #333;
-        font-size: 18px;
+        font-size: 20px;
         font-weight: 600;
-      ">Filling Form</h3>
+      ">🤖 AutoFill AI en cours</h3>
       <p style="
-        margin: 0 0 15px 0;
+        margin: 0 0 20px 0;
         color: #666;
-        font-size: 14px;
-        line-height: 1.4;
-      ">Please wait while we automatically fill the form fields with your profile data and AI suggestions...</p>
+        font-size: 15px;
+        line-height: 1.5;
+      ">Veuillez patienter pendant que nous remplissons automatiquement le formulaire...</p>
+      
       <div id="filling-progress" style="
         background: #f0f0f0;
-        height: 6px;
-        border-radius: 3px;
+        height: 8px;
+        border-radius: 4px;
         overflow: hidden;
-        margin: 15px 0;
+        margin: 20px 0;
       ">
         <div id="progress-bar" style="
           background: linear-gradient(90deg, #4f46e5, #7c3aed);
           height: 100%;
           width: 0%;
-          border-radius: 3px;
-          transition: width 0.3s ease;
+          border-radius: 4px;
+          transition: width 0.5s ease;
         "></div>
       </div>
+      
       <p id="filling-status" style="
-        margin: 10px 0 0 0;
+        margin: 12px 0 0 0;
         color: #888;
+        font-size: 13px;
+        font-weight: 500;
+      ">Initialisation...</p>
+      
+      <p id="filling-progress-text" style="
+        margin: 8px 0 0 0;
+        color: #666;
         font-size: 12px;
-      ">Initializing...</p>
+        font-weight: 500;
+      ">0 / 0 champs remplis</p>
+      
+      <div style="
+        margin-top: 20px;
+        padding: 12px;
+        background: #f8f9ff;
+        border-radius: 8px;
+        border-left: 4px solid #4f46e5;
+      ">
+        <p style="
+          margin: 0;
+          color: #5a5a5a;
+          font-size: 12px;
+          line-height: 1.4;
+        ">💡 <strong>Astuce:</strong> Ne modifiez pas le formulaire pendant le remplissage automatique.</p>
+      </div>
     </div>
     <style>
       @keyframes spin {
@@ -304,29 +332,67 @@ function createFillingOverlay() {
   `;
 
   document.body.appendChild(overlay);
+  
+  // Prevent all interaction with the page content
+  overlay.addEventListener('click', (e) => e.stopPropagation());
+  overlay.addEventListener('mousedown', (e) => e.stopPropagation());
+  overlay.addEventListener('keydown', (e) => e.stopPropagation());
+  overlay.addEventListener('touchstart', (e) => e.stopPropagation(), { passive: false });
+  overlay.addEventListener('wheel', (e) => e.preventDefault(), { passive: false });
+  
+  // Prevent scrolling on the body when overlay is active
+  document.body.style.overflow = 'hidden';
+  
   return overlay;
 }
 
-function updateFillingProgress(message) {
+function updateFillingProgress(message, current = null, total = null) {
   const statusElement = document.getElementById('filling-status');
   const progressBar = document.getElementById('progress-bar');
+  const progressText = document.getElementById('filling-progress-text');
   
   if (statusElement) {
     statusElement.textContent = message;
   }
   
-  // Update progress bar based on the message
-  if (progressBar) {
-    if (message.includes('Analyzing')) {
-      progressBar.style.width = '20%';
-    } else if (message.includes('profile')) {
-      progressBar.style.width = '50%';
-    } else if (message.includes('AI') || message.includes('Generating')) {
-      progressBar.style.width = '80%';
-    } else if (message.includes('Applying') || message.includes('Filling:')) {
-      progressBar.style.width = '95%';
-    } else if (message.includes('Completed') || message.includes('Still waiting')) {
-      progressBar.style.width = '100%';
+  // Update progress text if provided
+  if (current !== null && total !== null) {
+    if (progressText) {
+      progressText.textContent = `${current} / ${total} champs remplis`;
+    }
+    // Update progress bar based on actual progress
+    if (progressBar && total > 0) {
+      const percentage = Math.round((current / total) * 90) + 10; // 10-100%
+      progressBar.style.width = `${percentage}%`;
+    }
+  } else {
+    // Update progress bar based on the message
+    if (progressBar) {
+      if (message.includes('Initialisation') || message.includes('Préparation')) {
+        progressBar.style.width = '10%';
+      } else if (message.includes('Analyzing')) {
+        progressBar.style.width = '20%';
+      } else if (message.includes('profile')) {
+        progressBar.style.width = '50%';
+      } else if (message.includes('Remplissage:') || message.includes('Filling:')) {
+        // Extract progress if available in message like "Rempli 3/5 champs"
+        const match = message.match(/(\d+)\/(\d+)/);
+        if (match) {
+          const [, current, total] = match;
+          const percentage = Math.round((parseInt(current) / parseInt(total)) * 70) + 20; // 20-90%
+          progressBar.style.width = `${percentage}%`;
+        } else {
+          progressBar.style.width = '60%';
+        }
+      } else if (message.includes('AI') || message.includes('Generating')) {
+        progressBar.style.width = '80%';
+      } else if (message.includes('Applying') || message.includes('Filling:')) {
+        progressBar.style.width = '95%';
+      } else if (message.includes('Completed') || message.includes('terminé') || message.includes('succès')) {
+        progressBar.style.width = '100%';
+      } else if (message.includes('Still waiting')) {
+        progressBar.style.width = '100%';
+      }
     }
   }
 }
@@ -334,6 +400,9 @@ function updateFillingProgress(message) {
 function removeFillingOverlay() {
   const overlay = document.getElementById('autofill-filling-overlay');
   if (overlay) {
+    // Restore body scrolling
+    document.body.style.overflow = '';
+    
     // Fade out animation
     overlay.style.opacity = '0';
     overlay.style.transition = 'opacity 0.3s ease';
@@ -344,6 +413,48 @@ function removeFillingOverlay() {
     }, 300);
   }
 }
+
+// Add autofill styles to the page
+function addAutofillStyles() {
+  if (document.getElementById('autofill-styles')) {
+    return; // Already added
+  }
+  
+  const styles = document.createElement('style');
+  styles.id = 'autofill-styles';
+  styles.textContent = `
+    .autofill-filling {
+      outline: 2px solid #4f46e5 !important;
+      outline-offset: 2px !important;
+      transition: all 0.3s ease !important;
+    }
+    
+    .autofill-filled {
+      background-color: #e8f5e8 !important;
+      border-color: #22c55e !important;
+    }
+    
+    /* Overlay animations */
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    #autofill-filling-overlay {
+      animation: fadeIn 0.3s ease-out;
+    }
+  `;
+  
+  document.head.appendChild(styles);
+}
+
+// Initialize styles when content script loads
+addAutofillStyles();
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === "getDetectedForms") {
@@ -360,13 +471,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     sendResponse({ success: true });
     return true;
   }
+  if (message.action === "fillFormComplete") {
+    // Handle complete form filling process with overlay
+    handleCompleteFormFilling(message.formIndex, message.matchedFields, message.userProfile, message.totalFields);
+    sendResponse({ success: true });
+    return true;
+  }
   if (message.action === "showFillingOverlay") {
     createFillingOverlay();
     sendResponse({ success: true });
     return true;
   }
   if (message.action === "updateFillingProgress") {
-    updateFillingProgress(message.status);
+    updateFillingProgress(message.message || message.status);
     sendResponse({ success: true });
     return true;
   }
@@ -475,4 +592,255 @@ function fillFormWithSuggestions(formIndex, suggestions, isAIFilling = false) {
       
     }, index * 250);
   });
+}
+
+// Complete form filling function that handles the entire process
+async function handleCompleteFormFilling(formIndex, matchedFields, userProfile, totalFields) {
+  try {
+    console.log('🎯 Starting complete form filling process in content script');
+    
+    // Debug: Log the fields that were passed
+    console.log('📝 Received matched fields:', matchedFields.map(f => ({
+      name: f.field_name,
+      value: f.suggested_value,
+      matched: f.matched_profile_field
+    })));
+    
+    // Create and show overlay
+    createFillingOverlay();
+    updateFillingProgress('Préparation du remplissage...', 0, totalFields);
+    
+    // Small delay to show the overlay
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    const forms = document.querySelectorAll("form");
+    if (formIndex >= forms.length) {
+      throw new Error(`Form index ${formIndex} not found`);
+    }
+    
+    const form = forms[formIndex];
+    
+    // Fill fields one by one with progress updates
+    let successCount = 0;
+    let failedCount = 0;
+    const failedFields = [];
+    
+    for (let i = 0; i < matchedFields.length; i++) {
+      const field = matchedFields[i];
+      
+      try {
+        // Get a meaningful field name for progress display
+        const progressFieldName = field.field_info?.label || field.field_info?.placeholder || field.field_name || `Champ ${i + 1}`;
+        updateFillingProgress(`Remplissage: ${progressFieldName}...`, i, totalFields);
+        
+        // Find the target input with multiple fallback strategies
+        let targetInput = null;
+        let foundVia = '';
+        
+        try {
+          // Strategy 1: By name attribute
+          targetInput = form.querySelector(`[name="${field.field_name}"]`);
+          if (targetInput) foundVia = 'name';
+          
+          // Strategy 2: By ID
+          if (!targetInput) {
+            targetInput = form.querySelector(`#${field.field_name}`);
+            if (targetInput) foundVia = 'id';
+          }
+          
+          // Strategy 3: By field info properties
+          if (!targetInput && field.field_info) {
+            const fieldInfo = field.field_info;
+            const formInputs = form.querySelectorAll("input, textarea, select");
+            targetInput = Array.from(formInputs).find(input => {
+              return (
+                input.name === fieldInfo.name ||
+                input.id === fieldInfo.id ||
+                (fieldInfo.label && (getFieldLabel(input) === fieldInfo.label)) ||
+                (fieldInfo.placeholder && input.placeholder === fieldInfo.placeholder)
+              );
+            });
+            if (targetInput) foundVia = 'fieldInfo';
+          }
+        } catch (findError) {
+          console.warn(`❌ Error finding field ${field.field_name}:`, findError);
+          failedFields.push({ field: field.field_name, reason: 'field_not_found', error: findError.message });
+          failedCount++;
+          continue; // Skip to next field
+        }
+        
+        if (targetInput && field.suggested_value !== null && field.suggested_value !== undefined) {
+          try {
+            const fieldLabel = getFieldLabel(targetInput) || targetInput.name || targetInput.placeholder || 'field';
+            
+            // Fill the field based on its type and content with error handling
+            if (targetInput.tagName.toLowerCase() === 'select') {
+              // Handle select elements
+              try {
+                const options = Array.from(targetInput.options);
+                const matchingOption = options.find(option => 
+                  option.value.toLowerCase() === field.suggested_value.toLowerCase() ||
+                  option.text.toLowerCase() === field.suggested_value.toLowerCase()
+                );
+                if (matchingOption) {
+                  targetInput.value = matchingOption.value;
+                } else {
+                  throw new Error(`No matching option found for "${field.suggested_value}"`);
+                }
+              } catch (selectError) {
+                console.warn(`❌ Select field error for ${field.field_name}:`, selectError);
+                failedFields.push({ field: field.field_name, reason: 'select_option_not_found', error: selectError.message });
+                failedCount++;
+                continue;
+              }
+            } else if (targetInput.type === 'date' || field.matched_profile_field === 'dateOfBirth') {
+              // Handle date inputs specifically
+              try {
+                let dateValue = field.suggested_value;
+                
+                // If it's a date field but not in YYYY-MM-DD format, try to convert
+                if (dateValue && !dateValue.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                  const date = new Date(dateValue);
+                  if (!isNaN(date.getTime())) {
+                    dateValue = date.toISOString().split('T')[0];
+                  } else {
+                    throw new Error(`Invalid date format: ${dateValue}`);
+                  }
+                }
+                
+                targetInput.value = dateValue;
+                console.log(`📅 Date field filled: ${fieldLabel} = "${dateValue}" (via: ${foundVia})`);
+              } catch (dateError) {
+                console.warn(`❌ Date field error for ${field.field_name}:`, dateError);
+                failedFields.push({ field: field.field_name, reason: 'date_format_error', error: dateError.message });
+                failedCount++;
+                continue;
+              }
+            } else {
+              // Handle input and textarea elements
+              try {
+                targetInput.value = field.suggested_value.toString();
+              } catch (inputError) {
+                console.warn(`❌ Input field error for ${field.field_name}:`, inputError);
+                failedFields.push({ field: field.field_name, reason: 'input_value_error', error: inputError.message });
+                failedCount++;
+                continue;
+              }
+            }
+            
+            // Trigger events to notify the page (with error handling)
+            try {
+              targetInput.dispatchEvent(new Event('input', { bubbles: true }));
+              targetInput.dispatchEvent(new Event('change', { bubbles: true }));
+              targetInput.dispatchEvent(new Event('blur', { bubbles: true }));
+            } catch (eventError) {
+              console.warn(`⚠️ Event dispatch warning for ${field.field_name}:`, eventError);
+              // Don't fail the field for event errors, just warn
+            }
+            
+            // Visual feedback (with error handling)
+            try {
+              targetInput.classList.add('autofill-filling');
+              setTimeout(() => {
+                try {
+                  targetInput.style.backgroundColor = '#e8f5e8';
+                  targetInput.style.transition = 'background-color 0.3s';
+                } catch (styleError) {
+                  console.warn(`⚠️ Style warning for ${field.field_name}:`, styleError);
+                }
+              }, 100);
+              setTimeout(() => {
+                try {
+                  targetInput.style.backgroundColor = '';
+                  targetInput.classList.remove('autofill-filling');
+                } catch (styleError) {
+                  console.warn(`⚠️ Style cleanup warning for ${field.field_name}:`, styleError);
+                }
+              }, 2000);
+            } catch (visualError) {
+              console.warn(`⚠️ Visual feedback warning for ${field.field_name}:`, visualError);
+              // Don't fail for visual feedback errors
+            }
+            
+            console.log(`✅ Filled: ${fieldLabel} = "${field.suggested_value}" (via: ${foundVia})`);
+            successCount++;
+            
+          } catch (fillError) {
+            console.warn(`❌ Failed to fill ${field.field_name}:`, fillError);
+            failedFields.push({ field: field.field_name, reason: 'fill_operation_failed', error: fillError.message });
+            failedCount++;
+          }
+        } else {
+          console.warn(`❌ Could not find field or value: ${field.field_name}`);
+          failedFields.push({ field: field.field_name, reason: 'field_or_value_missing' });
+          failedCount++;
+        }
+        
+        // Update progress with meaningful field name
+        const completedFieldName = field.field_info?.label || field.field_info?.placeholder || field.field_name || `Champ ${i + 1}`;
+        updateFillingProgress(`Rempli: ${completedFieldName}`, i + 1, totalFields);
+        
+        // Small delay for visual feedback (continue even if this fails)
+        try {
+          await new Promise(resolve => setTimeout(resolve, 300));
+        } catch (delayError) {
+          console.warn('⚠️ Delay warning:', delayError);
+        }
+        
+      } catch (outerError) {
+        console.error(`❌ Unexpected error processing field ${field.field_name}:`, outerError);
+        failedFields.push({ field: field.field_name, reason: 'unexpected_error', error: outerError.message });
+        failedCount++;
+      }
+    }
+    
+    // Show completion
+    updateFillingProgress(`Formulaire rempli avec succès! ${successCount}/${totalFields} champs`, totalFields, totalFields);
+    
+    // Auto-remove overlay after showing completion
+    setTimeout(() => {
+      removeFillingOverlay();
+    }, 2500);
+    
+    console.log(`🎉 Form filling completed! Filled ${successCount}/${totalFields} fields`);
+    
+    // Log summary of failed fields if any
+    if (failedCount > 0) {
+      console.warn(`⚠️ ${failedCount} fields failed to fill:`, failedFields);
+    }
+    
+  } catch (error) {
+    console.error('❌ Form filling error:', error);
+    updateFillingProgress('Erreur lors du remplissage du formulaire');
+    
+    // Remove overlay after error
+    setTimeout(() => {
+      removeFillingOverlay();
+    }, 3000);
+  }
+}
+
+// Debug function to log field details
+function logFieldDebugInfo(fields, userProfile) {
+  console.log('🔍 Debug: All detected fields:', fields.map(f => ({
+    name: f.name,
+    label: f.label,
+    type: f.type,
+    placeholder: f.placeholder
+  })));
+  
+  // Check specifically for potential birth date fields
+  const potentialBirthFields = fields.filter(f => {
+    const identifiers = [f.label, f.name, f.placeholder].filter(Boolean).map(s => s.toLowerCase());
+    return identifiers.some(id => 
+      id.includes('birth') || id.includes('naissance') || id.includes('age') || 
+      id.includes('âge') || id.includes('né') || id.includes('born')
+    );
+  });
+  
+  if (potentialBirthFields.length > 0) {
+    console.log('🎂 Potential birth date fields found:', potentialBirthFields);
+  }
+  
+  console.log('👤 User profile birth date:', userProfile.profile?.dateOfBirth);
 }

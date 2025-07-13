@@ -27,7 +27,7 @@
     "postal", "zip", "zipcode", "postal_code", "code_postal", "código_postal", "郵便番号", "الرمز البريدي", "postcode", "cp", "zip_code", "postal-code"
   ],
   "dateOfBirth": [
-    "birth", "birthday", "date_birth", "naissance", "fecha_nacimiento", "生年月日", "تاريخ الميلاد", "birthdate", "dob", "date_of_birth", "birth_date", "date-of-birth"
+    "birth", "birthday", "date_birth", "naissance", "fecha_nacimiento", "生年月日", "تاريخ الميلاد", "birthdate", "dob", "date_of_birth", "birth_date", "date-of-birth", "date-birth", "dateofbirth", "date_naissance", "naissance_date", "birth-date", "bday", "date_de_naissance", "born"
   ],
   "gender": [
     "gender", "sexe", "género", "性別", "الجنس", "sex", "genero", "sexo"

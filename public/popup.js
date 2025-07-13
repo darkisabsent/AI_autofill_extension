@@ -229,8 +229,16 @@ class PopupManager {
             const response = await fetch('field-mappings.json');
             const data = await response.json();
             this.fieldMappings = data;
+            console.log('📋 Field mappings loaded from JSON:', {
+                dateOfBirth: data.dateOfBirth,
+                totalMappings: Object.keys(data).length
+            });
         } catch (error) {
-            this.fieldMappings = {};
+            console.warn('❌ Failed to load field-mappings.json, using constants fallback:', error);
+            this.fieldMappings = FIELD_MAPPINGS;
+            console.log('📋 Using fallback mappings:', {
+                dateOfBirth: this.fieldMappings.dateOfBirth
+            });
         }
     }
 

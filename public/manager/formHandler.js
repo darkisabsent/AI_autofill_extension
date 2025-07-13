@@ -117,7 +117,7 @@ export async function fillForm(instance, formIndex) {
     if (!instance.detectedForms[formIndex]) {
         return;
     }
-    let overlay = null;
+    
     try {
         // Get user profile
         const storage = await new Promise(resolve =>
@@ -127,80 +127,44 @@ export async function fillForm(instance, formIndex) {
             displayMessage('Erreur: Profil utilisateur non trouvé');
             return;
         }
+        
         const userProfile = storage.currentUser;
         const formData = instance.detectedForms[formIndex];
+        
         // Analyze fields first
         const allSuggestions = generateFieldSuggestions(formData.fields, userProfile, instance.fieldMappings);
+        
+        // Debug: Log all suggestions
+        console.log('🔍 All field suggestions generated:', allSuggestions.map(s => ({
+            field: s.field_name,
+            suggested: s.suggested_value,
+            matched: s.matched_profile_field
+        })));
+        
         const { matchedFields } = separateMatchedFields(allSuggestions, formData.fields, (field) => isOpenEndedQuestion(field));
+        
         if (!matchedFields.length) {
             displayMessage('Aucun champ correspondant trouvé');
             return;
         }
-        // Show overlay
-        showOverlay(matchedFields.length);
-        console.log('Overlay shown');
-        // Fill profile fields one by one
-        for (let i = 0; i < matchedFields.length; i++) {
-            const field = matchedFields[i];
-            console.log(`✍️ Filling profile field ${i+1}/${matchedFields.length}:`, field.field_name);
-            try {
-                const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-                await chrome.tabs.sendMessage(tab.id, {
-                    action: 'fillForm',
-                    formIndex: formIndex,
-                    suggestions: [field],
-                    userId: userProfile.id,
-                    isAIFilling: false
-                });
-                console.log(`✅ Filled ${field.field_name} with:`, field.suggested_value);
-            } catch (err) {
-                console.warn(`❌ Failed to fill ${field.field_name}:`, err);
-            }
-            updateOverlayProgress(i + 1, matchedFields.length);
-            await new Promise(resolve => setTimeout(resolve, 300));
-        }
+        
+        // Send all data to content script to handle the entire filling process
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        await chrome.tabs.sendMessage(tab.id, {
+            action: 'fillFormComplete',
+            formIndex: formIndex,
+            matchedFields: matchedFields,
+            userProfile: userProfile,
+            totalFields: matchedFields.length
+        });
+        
+        // Show success message in popup
+        displayMessage('✅ Remplissage du formulaire démarré!');
+        
     } catch (error) {
         console.error('Form filling error:', error);
         displayMessage('❌ Erreur lors du remplissage');
-    } finally {
-        hideOverlay();
-        console.log('Overlay hidden');
     }
 }
 
-function showOverlay(totalFields) {
-    hideOverlay(); // Remove any existing overlay first
-    const overlay = document.createElement('div');
-    overlay.id = 'autofillOverlay';
-    overlay.style.cssText = `
-        position: fixed;
-        top: 0; left: 0; width: 100vw; height: 100vh;
-        background: rgba(0,0,0,0.5);
-        z-index: 999999;
-        display: flex; align-items: center; justify-content: center;
-    `;
-    overlay.innerHTML = `
-        <div style="background: #fff; padding: 32px 40px; border-radius: 10px; box-shadow: 0 8px 32px rgba(0,0,0,0.2); text-align: center; min-width: 320px;">
-            <h3 style="margin-bottom: 16px; color: #333;">Remplissage du profil...</h3>
-            <div id="autofillProgressBar" style="background: #eee; height: 8px; border-radius: 4px; overflow: hidden; margin-bottom: 12px;">
-                <div id="autofillProgress" style="background: linear-gradient(90deg,#4f46e5,#7c3aed); height: 100%; width: 0%; transition: width 0.3s;"></div>
-            </div>
-            <div id="autofillProgressText" style="font-size: 14px; color: #666;">0 / ${totalFields} champs</div>
-        </div>
-    `;
-    document.body.appendChild(overlay);
-}
 
-function updateOverlayProgress(current, total) {
-    const bar = document.getElementById('autofillProgress');
-    const text = document.getElementById('autofillProgressText');
-    if (bar) bar.style.width = `${Math.round((current/total)*100)}%`;
-    if (text) text.textContent = `${current} / ${total} champs`;
-}
-
-function hideOverlay() {
-    const overlay = document.getElementById('autofillOverlay');
-    if (overlay) {
-        overlay.remove();
-    }
-}

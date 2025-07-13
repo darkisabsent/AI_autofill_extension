@@ -172,7 +172,15 @@ export function generateFieldSuggestions(fields, userProfile, fieldMappings) {
         city: () => profile.city,
         country: () => profile.country,
         postalCode: () => profile.postalCode,
-        dateOfBirth: () => profile.dateOfBirth ? new Date(profile.dateOfBirth).toISOString().split('T')[0] : '',
+        dateOfBirth: () => {
+            if (!profile.dateOfBirth) return '';
+            
+            const date = new Date(profile.dateOfBirth);
+            if (isNaN(date.getTime())) return '';
+            
+            // Return ISO format (YYYY-MM-DD) which works with most date inputs
+            return date.toISOString().split('T')[0];
+        },
         gender: () => profile.gender,
         hobbies: () => profile.hobbies,
         professionalCompanyName: () => profile.professionalCompanyName,
@@ -199,6 +207,16 @@ export function generateFieldSuggestions(fields, userProfile, fieldMappings) {
         let suggestedValue = null;
         let matchedField = null;
 
+        // Debug logging for birth date fields
+        if (fieldIdentifiers.some(id => id.includes('birth') || id.includes('naissance') || id.includes('age') || id.includes('âge'))) {
+            console.log('🔍 Birth date field detected:', {
+                fieldName: field.field_name,
+                identifiers: fieldIdentifiers,
+                fieldType: field.type,
+                userDateOfBirth: profile.dateOfBirth
+            });
+        }
+
         for (const [profileField, keywords] of Object.entries(fieldMappings)) {
             if (valueGetters[profileField]) {
                 for (const identifier of fieldIdentifiers) {
@@ -208,6 +226,17 @@ export function generateFieldSuggestions(fields, userProfile, fieldMappings) {
                             if (value && value.toString().trim() !== '') {
                                 suggestedValue = value;
                                 matchedField = profileField;
+                                
+                                // Debug logging for matches
+                                if (profileField === 'dateOfBirth') {
+                                    console.log('✅ Birth date matched:', {
+                                        fieldName: field.field_name,
+                                        identifier,
+                                        keyword,
+                                        value,
+                                        originalDate: profile.dateOfBirth
+                                    });
+                                }
                                 break;
                             }
                         }
