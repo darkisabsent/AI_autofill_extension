@@ -29,16 +29,9 @@ export function displayDetectedForms(instance, forms) {
     
     if (forms.length === 0) {
         container.innerHTML = `
-            <div style="text-align: center; padding: 20px; color: #666;">
-                <p style="margin: 0 0 10px 0; font-size: 13px;">Aucun formulaire détecté sur cette page.</p>
-                <button id="refreshFormsBtn" style="
-                    background: #f0f0f0; 
-                    border: 1px solid #ddd; 
-                    padding: 6px 12px; 
-                    border-radius: 4px; 
-                    cursor: pointer;
-                    font-size: 12px;
-                ">🔄 Actualiser la détection</button>
+            <div class="no-forms-message">
+                <p class="no-forms-text">Aucun formulaire détecté sur cette page.</p>
+                <button id="refreshFormsBtn" class="refresh-forms-btn">🔄 Actualiser la détection</button>
             </div>
         `;
         
@@ -50,58 +43,34 @@ export function displayDetectedForms(instance, forms) {
     
     // Ajouter un en-tête indiquant le nombre de formulaires détectés
     const header = document.createElement('div');
-    header.style.cssText = `
-        background: #f8f9fa;
-        padding: 8px 12px;
-        border-radius: 6px;
-        margin-bottom: 12px;
-        font-size: 13px;
-        color: #495057;
-        border: 1px solid #e9ecef;
-    `;
+    header.className = 'forms-header';
     header.innerHTML = `
         <strong>📋 ${forms.length} formulaire${forms.length > 1 ? 's' : ''} détecté${forms.length > 1 ? 's' : ''}</strong>
-        <span style="float: right; color: #6c757d; font-size: 11px;">Prêt à remplir</span>
+        <span class="forms-status">Prêt à remplir</span>
     `;
     container.appendChild(header);
     
     forms.forEach((form, index) => {
         const formElement = document.createElement('div');
         formElement.className = 'form-item';
-        formElement.style.cssText = `
-            border: 1px solid #ddd;
-            padding: 12px;
-            margin: 8px 0;
-            border-radius: 6px;
-            background: #f9f9f9;
-        `;
         formElement.innerHTML = `
-            <h4 style="margin: 0 0 8px 0; color: #333;">Formulaire ${index + 1}</h4>
-            <p style="margin: 4px 0; color: #666; font-size: 13px;">
+            <h4 class="form-item-title">Formulaire ${index + 1}</h4>
+            <p class="form-item-info">
                 ${form.fieldCount} champs détectés | Action: ${form.action || 'Non définie'}
             </p>
-            <details style="margin: 8px 0;">
-                <summary style="cursor: pointer; color: #666; font-size: 12px;">Voir les champs</summary>
-                <div style="margin-top: 8px; font-size: 11px;">
+            <details class="form-fields-details">
+                <summary class="form-fields-summary">Voir les champs</summary>
+                <div class="form-fields-content">
                     ${form.fields.map(field => `
-                        <div style="margin: 4px 0; padding: 4px; background: white; border-radius: 3px;">
+                        <div class="form-field-item">
                             <strong>${field.label || field.name}</strong> (${field.type})
-                            ${field.required ? ' <span style="color: red;">*</span>' : ''}
-                            ${field.placeholder ? `<br><em style="color: #999;">Placeholder: ${field.placeholder}</em>` : ''}
+                            ${field.required ? ' <span class="field-required">*</span>' : ''}
+                            ${field.placeholder ? `<br><em class="field-placeholder">Placeholder: ${field.placeholder}</em>` : ''}
                         </div>
                     `).join('')}
                 </div>
             </details>
-            <button class="btn btn-primary" id="fillFormBtn-${index}" style="
-                margin-top: 8px;
-                background: #007bff;
-                color: white;
-                border: none;
-                padding: 8px 16px;
-                border-radius: 4px;
-                cursor: pointer;
-                font-size: 13px;
-            ">
+            <button class="btn btn-primary fill-form-btn" id="fillFormBtn-${index}">
                 🚀 Remplir automatiquement le formulaire
             </button>
         `;

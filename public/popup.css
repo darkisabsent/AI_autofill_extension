@@ -347,3 +347,115 @@ body {
 .button-spacing {
     height: 10px; /* Adjust the height as needed */
 }
+
+/* Form Detection Styles */
+.no-forms-message {
+    text-align: center;
+    padding: 20px;
+    color: #666;
+}
+
+.no-forms-text {
+    margin: 0 0 10px 0;
+    font-size: 13px;
+}
+
+.refresh-forms-btn {
+    background: #f0f0f0;
+    border: 1px solid #ddd;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.forms-header {
+    background: #f8f9fa;
+    padding: 8px 12px;
+    border-radius: 6px;
+    margin-bottom: 12px;
+    font-size: 13px;
+    color: #495057;
+    border: 1px solid #e9ecef;
+}
+
+.forms-status {
+    float: right;
+    color: #6c757d;
+    font-size: 11px;
+}
+
+.form-item {
+    border: 1px solid #ddd;
+    padding: 12px;
+    margin: 8px 0;
+    border-radius: 6px;
+    background: #f9f9f9;
+}
+
+.form-item-title {
+    margin: 0 0 8px 0;
+    color: #333;
+}
+
+.form-item-info {
+    margin: 4px 0;
+    color: #666;
+    font-size: 13px;
+}
+
+.form-fields-details {
+    margin: 8px 0;
+}
+
+.form-fields-summary {
+    cursor: pointer;
+    color: #666;
+    font-size: 12px;
+}
+
+.form-fields-content {
+    margin-top: 8px;
+    font-size: 11px;
+}
+
+.form-field-item {
+    margin: 4px 0;
+    padding: 4px;
+    background: white;
+    border-radius: 3px;
+}
+
+.field-required {
+    color: red;
+}
+
+.field-placeholder {
+    color: #999;
+}
+
+.fill-form-btn {
+    margin-top: 8px;
+    background: #007bff;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+}
+
+/* Message Styles */
+.no-forms-popup-message {
+    color: #666;
+    font-size: 13px;
+    text-align: center;
+    padding: 20px;
+}
+
+.forms-error-message {
+    color: #999;
+    font-size: 13px;
+    text-align: center;
+    padding: 20px;
+}

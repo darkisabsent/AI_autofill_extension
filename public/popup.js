@@ -313,11 +313,11 @@ class PopupManager {
             } else {
                 // If no cached forms, show a message or refresh detection
                 const container = document.getElementById('formsContainer');
-                container.innerHTML = '<p style="color: #666; font-size: 13px; text-align: center; padding: 20px;">No forms detected on this page.</p>';
+                container.innerHTML = '<p class="no-forms-popup-message">No forms detected on this page.</p>';
             }
         } catch (error) {
             const container = document.getElementById('formsContainer');
-            container.innerHTML = '<p style="color: #999; font-size: 13px; text-align: center; padding: 20px;">Unable to detect forms. Please refresh the page.</p>';
+            container.innerHTML = '<p class="forms-error-message">Unable to detect forms. Please refresh the page.</p>';
         }
     }
 }

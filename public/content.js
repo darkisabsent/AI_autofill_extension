@@ -228,107 +228,26 @@ function createFillingOverlay() {
 
   const overlay = document.createElement('div');
   overlay.id = 'autofill-filling-overlay';
-  overlay.style.cssText = `
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    background: rgba(0, 0, 0, 0.85);
-    z-index: 2147483647;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    backdrop-filter: blur(4px);
-    font-family: system-ui, -apple-system, sans-serif;
-    pointer-events: all;
-    user-select: none;
-  `;
+  overlay.className = 'autofill-content-overlay';
 
   overlay.innerHTML = `
-    <div style="
-      background: white;
-      padding: 40px;
-      border-radius: 16px;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.4);
-      text-align: center;
-      max-width: 450px;
-      position: relative;
-      min-width: 350px;
-    ">
-      <div style="
-        width: 60px;
-        height: 60px;
-        border: 4px solid #f3f3f3;
-        border-top: 4px solid #4f46e5;
-        border-radius: 50%;
-        animation: spin 1s linear infinite;
-        margin: 0 auto 24px auto;
-      "></div>
-      <h3 style="
-        margin: 0 0 12px 0;
-        color: #333;
-        font-size: 20px;
-        font-weight: 600;
-      ">🤖 AutoFill AI en cours</h3>
-      <p style="
-        margin: 0 0 20px 0;
-        color: #666;
-        font-size: 15px;
-        line-height: 1.5;
-      ">Veuillez patienter pendant que nous remplissons automatiquement le formulaire...</p>
+    <div class="autofill-content-modal">
+      <div class="autofill-content-spinner"></div>
+      <h3 class="autofill-content-title">🤖 AutoFill AI en cours</h3>
+      <p class="autofill-content-description">Veuillez patienter pendant que nous remplissons automatiquement le formulaire...</p>
       
-      <div id="filling-progress" style="
-        background: #f0f0f0;
-        height: 8px;
-        border-radius: 4px;
-        overflow: hidden;
-        margin: 20px 0;
-      ">
-        <div id="progress-bar" style="
-          background: linear-gradient(90deg, #4f46e5, #7c3aed);
-          height: 100%;
-          width: 0%;
-          border-radius: 4px;
-          transition: width 0.5s ease;
-        "></div>
+      <div id="filling-progress" class="autofill-content-progress">
+        <div id="progress-bar" class="autofill-content-progress-bar"></div>
       </div>
       
-      <p id="filling-status" style="
-        margin: 12px 0 0 0;
-        color: #888;
-        font-size: 13px;
-        font-weight: 500;
-      ">Initialisation...</p>
+      <p id="filling-status" class="autofill-content-status">Initialisation...</p>
       
-      <p id="filling-progress-text" style="
-        margin: 8px 0 0 0;
-        color: #666;
-        font-size: 12px;
-        font-weight: 500;
-      ">0 / 0 champs remplis</p>
+      <p id="filling-progress-text" class="autofill-content-progress-text">0 / 0 champs remplis</p>
       
-      <div style="
-        margin-top: 20px;
-        padding: 12px;
-        background: #f8f9ff;
-        border-radius: 8px;
-        border-left: 4px solid #4f46e5;
-      ">
-        <p style="
-          margin: 0;
-          color: #5a5a5a;
-          font-size: 12px;
-          line-height: 1.4;
-        ">💡 <strong>Astuce:</strong> Ne modifiez pas le formulaire pendant le remplissage automatique.</p>
+      <div class="autofill-content-tip">
+        <p>💡 <strong>Astuce:</strong> Ne modifiez pas le formulaire pendant le remplissage automatique.</p>
       </div>
     </div>
-    <style>
-      @keyframes spin {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
-      }
-    </style>
   `;
 
   document.body.appendChild(overlay);
