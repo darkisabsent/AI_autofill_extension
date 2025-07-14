@@ -8,7 +8,7 @@ export const FIELD_MAPPINGS = {
     city: ['city', 'ville'],
     country: ['country', 'pays'],
     postalCode: ['postal code', 'zip', 'code postal'],
-    dateOfBirth: ['date of birth', 'dob', 'birthdate', 'naissance', 'birth', 'birthday', 'date_birth', 'fecha_nacimiento', 'birth_date', 'date-of-birth', 'date-birth', 'dateofbirth', 'date_naissance', 'naissance_date', 'birth-date', 'bday', 'date_de_naissance', 'age', 'âge', 'born', 'né', 'nacido'],
+    dateOfBirth: ['date of birth', 'dob', 'birthdate', 'naissance', 'birth', 'birthday', 'date_birth', 'fecha_nacimiento', 'birth_date', 'date-of-birth', 'date-birth', 'dateofbirth', 'date_naissance', 'naissance_date', 'birth-date', 'bday', 'date_de_naissance', 'born', 'né', 'nacido'],
     gender: ['gender', 'sexe'],
     hobbies: ['hobbies', 'loisirs', 'interests'],
     professionalCompanyName: ['company', 'entreprise', 'employeur'],
