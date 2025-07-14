@@ -237,7 +237,7 @@ function createFillingOverlay() {
       <p class="autofill-content-description">Veuillez patienter pendant que nous remplissons automatiquement le formulaire...</p>
       
       <div id="filling-progress" class="autofill-content-progress">
-        <div id="progress-bar" class="autofill-content-progress-bar"></div>
+        <div id="progress-bar" class="autofill-content-progress-bar" style="width: 0%;"></div>
       </div>
       
       <p id="filling-status" class="autofill-content-status">Initialisation...</p>
@@ -262,6 +262,9 @@ function createFillingOverlay() {
   // Prevent scrolling on the body when overlay is active
   document.body.style.overflow = 'hidden';
   
+  // Force a reflow to ensure animations and transitions work correctly
+  void overlay.offsetWidth;
+
   return overlay;
 }
 
@@ -281,37 +284,36 @@ function updateFillingProgress(message, current = null, total = null) {
     }
     // Update progress bar based on actual progress
     if (progressBar && total > 0) {
-      const percentage = Math.round((current / total) * 90) + 10; // 10-100%
-      progressBar.style.width = `${percentage}%`;
+      const percentage = Math.min(100, Math.round((current / total) * 100));
+      
+      // Force reflow and set width with explicit styling
+      progressBar.offsetHeight;
+      progressBar.style.cssText = `
+        width: ${percentage}% !important;
+        height: 100% !important;
+        background: linear-gradient(90deg, #4f46e5, #7c3aed) !important;
+        border-radius: 5px !important;
+        transition: width 0.4s cubic-bezier(0.25, 1, 0.5, 1) !important;
+      `;
     }
   } else {
-    // Update progress bar based on the message
+    // Fallback for messages without explicit progress numbers
     if (progressBar) {
-      if (message.includes('Initialisation') || message.includes('Préparation')) {
-        progressBar.style.width = '10%';
-      } else if (message.includes('Analyzing')) {
-        progressBar.style.width = '20%';
-      } else if (message.includes('profile')) {
-        progressBar.style.width = '50%';
-      } else if (message.includes('Remplissage:') || message.includes('Filling:')) {
-        // Extract progress if available in message like "Rempli 3/5 champs"
-        const match = message.match(/(\d+)\/(\d+)/);
-        if (match) {
-          const [, current, total] = match;
-          const percentage = Math.round((parseInt(current) / parseInt(total)) * 70) + 20; // 20-90%
-          progressBar.style.width = `${percentage}%`;
-        } else {
-          progressBar.style.width = '60%';
-        }
-      } else if (message.includes('AI') || message.includes('Generating')) {
-        progressBar.style.width = '80%';
-      } else if (message.includes('Applying') || message.includes('Filling:')) {
-        progressBar.style.width = '95%';
-      } else if (message.includes('Completed') || message.includes('terminé') || message.includes('succès')) {
-        progressBar.style.width = '100%';
-      } else if (message.includes('Still waiting')) {
-        progressBar.style.width = '100%';
-      }
+      let percentage = 10; // Default starting point
+      if (message.includes('Préparation')) percentage = 10;
+      if (message.includes('Remplissage')) percentage = 40;
+      if (message.includes('succès')) percentage = 100;
+      if (message.includes('Erreur')) percentage = 0;
+      
+      // Force reflow and set width with explicit styling
+      progressBar.offsetHeight;
+      progressBar.style.cssText = `
+        width: ${percentage}% !important;
+        height: 100% !important;
+        background: linear-gradient(90deg, #4f46e5, #7c3aed) !important;
+        border-radius: 5px !important;
+        transition: width 0.4s cubic-bezier(0.25, 1, 0.5, 1) !important;
+      `;
     }
   }
 }
@@ -347,25 +349,68 @@ function addAutofillStyles() {
       outline-offset: 2px !important;
       transition: all 0.3s ease !important;
     }
-    
     .autofill-filled {
       background-color: #e8f5e8 !important;
       border-color: #22c55e !important;
     }
-    
-    /* Overlay animations */
+    #autofill-filling-overlay {
+      position: fixed !important;
+      top: 0 !important;
+      left: 0 !important;
+      width: 100vw !important;
+      height: 100vh !important;
+      background: rgba(0, 0, 0, 0.85) !important;
+      z-index: 2147483647 !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      backdrop-filter: blur(4px) !important;
+      font-family: system-ui, -apple-system, sans-serif !important;
+      pointer-events: all !important;
+      user-select: none !important;
+      animation: fadeIn 0.3s ease-out;
+    }
+    .autofill-content-modal {
+      background: white !important;
+      padding: 40px !important;
+      border-radius: 16px !important;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.4) !important;
+      text-align: center !important;
+      max-width: 450px !important;
+      position: relative !important;
+      min-width: 350px !important;
+    }
+    .autofill-content-spinner {
+      width: 50px !important;
+      height: 50px !important;
+      border: 4px solid #f3f3f3 !important;
+      border-top: 4px solid #4f46e5 !important;
+      border-radius: 50% !important;
+      animation: spin 1s linear infinite !important;
+      margin: 0 auto 24px auto !important;
+    }
+    .autofill-content-progress {
+      background: #e9ecef !important;
+      height: 10px !important;
+      border-radius: 5px !important;
+      overflow: hidden !important;
+      margin: 20px 0 !important;
+      border: 1px solid #dee2e6;
+    }
+    .autofill-content-progress-bar {
+      background: linear-gradient(90deg, #4f46e5, #7c3aed) !important;
+      height: 100% !important;
+      width: 0% !important;
+      border-radius: 5px !important;
+      transition: width 0.4s cubic-bezier(0.25, 1, 0.5, 1) !important;
+    }
     @keyframes spin {
       0% { transform: rotate(0deg); }
       100% { transform: rotate(360deg); }
     }
-    
     @keyframes fadeIn {
       from { opacity: 0; transform: translateY(20px); }
       to { opacity: 1; transform: translateY(0); }
-    }
-    
-    #autofill-filling-overlay {
-      animation: fadeIn 0.3s ease-out;
     }
   `;
   
@@ -402,7 +447,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
   if (message.action === "updateFillingProgress") {
-    updateFillingProgress(message.message || message.status);
+    updateFillingProgress(message.message || message.status, message.current, message.total);
     sendResponse({ success: true });
     return true;
   }
@@ -730,7 +775,7 @@ async function handleCompleteFormFilling(formIndex, matchedFields, userProfile, 
     
   } catch (error) {
     console.error('❌ Form filling error:', error);
-    updateFillingProgress('Erreur lors du remplissage du formulaire');
+    updateFillingProgress('Erreur lors du remplissage du formulaire', 0, totalFields);
     
     // Remove overlay after error
     setTimeout(() => {

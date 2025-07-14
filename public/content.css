@@ -157,23 +157,22 @@
 }
 
 .autofill-progress-track {
-    background: #f0f0f0 !important;
-    border-radius: 4px !important;
-    height: 8px !important;
-    overflow: hidden !important;
+    background: #f0f0f0;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    height: 8px;
+    overflow: hidden;
 }
 
 .autofill-progress-bar {
-    height: 100% !important;
-    transition: width 0.5s ease-in-out !important;
-}
-
-.autofill-progress-bar.profile {
-    background: linear-gradient(90deg, #667eea 0%, #764ba2 100%) !important;
+    height: 100%;
+    transition: width 0.5s ease-in-out;
+    /* Remove !important from width so JS can control it */
+    background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
 }
 
 .autofill-progress-bar.ai {
-    background: linear-gradient(90deg, #4CAF50 0%, #45a049 100%) !important;
+    background: linear-gradient(90deg, #4CAF50 0%, #45a049 100%);
 }
 
 .autofill-overlay-timer {
