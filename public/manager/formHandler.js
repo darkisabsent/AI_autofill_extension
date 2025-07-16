@@ -16,10 +16,10 @@ export async function detectForms(instance) {
         if (response && response.forms) {
             displayDetectedForms(instance, response.forms);
         } else {
-            displayMessage('Aucun formulaire détecté sur cette page.');
+            displayMessage('No forms detected on this page.');
         }
     } catch (error) {
-        displayMessage('Erreur lors de la détection des formulaires. Assurez-vous que la page est complètement chargée.');
+        displayMessage('Error detecting forms. Please make sure the page is fully loaded.');
     }
 }
 
@@ -30,8 +30,9 @@ export function displayDetectedForms(instance, forms) {
     if (forms.length === 0) {
         container.innerHTML = `
             <div class="no-forms-message">
-                <p class="no-forms-text">Aucun formulaire détecté sur cette page.</p>
-                <button id="refreshFormsBtn" class="refresh-forms-btn">🔄 Actualiser la détection</button>
+                <p class="no-forms-text">No forms detected on this page.</p>
+                <p class="reload-message">Please reload the page to detect forms.</p>
+                <button id="refreshFormsBtn" class="btn btn-secondary">🔄 Try Again</button>
             </div>
         `;
         
@@ -41,12 +42,12 @@ export function displayDetectedForms(instance, forms) {
         return;
     }
     
-    // Ajouter un en-tête indiquant le nombre de formulaires détectés
+    // Add header showing number of detected forms
     const header = document.createElement('div');
     header.className = 'forms-header';
     header.innerHTML = `
-        <strong>📋 ${forms.length} formulaire${forms.length > 1 ? 's' : ''} détecté${forms.length > 1 ? 's' : ''}</strong>
-        <span class="forms-status">Prêt à remplir</span>
+        <strong>📋 ${forms.length} form${forms.length > 1 ? 's' : ''} detected</strong>
+        <span class="forms-status">Ready to fill</span>
     `;
     container.appendChild(header);
     
@@ -54,12 +55,12 @@ export function displayDetectedForms(instance, forms) {
         const formElement = document.createElement('div');
         formElement.className = 'form-item';
         formElement.innerHTML = `
-            <h4 class="form-item-title">Formulaire ${index + 1}</h4>
+            <h4 class="form-item-title">Form ${index + 1}</h4>
             <p class="form-item-info">
-                ${form.fieldCount} champs détectés | Action: ${form.action || 'Non définie'}
+                ${form.fieldCount} fields detected | Action: ${form.action || 'Not defined'}
             </p>
             <details class="form-fields-details">
-                <summary class="form-fields-summary">Voir les champs</summary>
+                <summary class="form-fields-summary">View fields</summary>
                 <div class="form-fields-content">
                     ${form.fields.map(field => `
                         <div class="form-field-item">
@@ -71,7 +72,7 @@ export function displayDetectedForms(instance, forms) {
                 </div>
             </details>
             <button class="btn btn-primary fill-form-btn" id="fillFormBtn-${index}">
-                🚀 Remplir automatiquement le formulaire
+                🚀 Auto-fill form
             </button>
         `;
         container.appendChild(formElement);
@@ -93,7 +94,7 @@ export async function fillForm(instance, formIndex) {
             chrome.storage.local.get(['currentUser'], resolve)
         );
         if (!storage.currentUser || !storage.currentUser.profile) {
-            displayMessage('Erreur: Profil utilisateur non trouvé');
+            displayMessage('Error: User profile not found');
             return;
         }
         
@@ -113,7 +114,7 @@ export async function fillForm(instance, formIndex) {
         const { matchedFields } = separateMatchedFields(allSuggestions, formData.fields, (field) => isOpenEndedQuestion(field));
         
         if (!matchedFields.length) {
-            displayMessage('Aucun champ correspondant trouvé');
+            displayMessage('No matching fields found');
             return;
         }
         
@@ -128,11 +129,11 @@ export async function fillForm(instance, formIndex) {
         });
         
         // Show success message in popup
-        displayMessage('✅ Remplissage du formulaire démarré!');
+        displayMessage('✅ Form filling started!');
         
     } catch (error) {
         console.error('Form filling error:', error);
-        displayMessage('❌ Erreur lors du remplissage');
+        displayMessage('❌ Error filling form');
     }
 }
 

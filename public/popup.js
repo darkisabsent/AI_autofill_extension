@@ -311,13 +311,43 @@ class PopupManager {
             if (response && response.forms && response.forms.length > 0) {
                 this.displayDetectedForms(response.forms);
             } else {
-                // If no cached forms, show a message or refresh detection
-                const container = document.getElementById('formsContainer');
-                container.innerHTML = '<p class="no-forms-popup-message">No forms detected on this page.</p>';
+                // If no cached forms, try to detect them
+                const detectResponse = await chrome.tabs.sendMessage(tab.id, { action: 'detectForms' });
+                if (detectResponse && detectResponse.forms && detectResponse.forms.length > 0) {
+                    this.displayDetectedForms(detectResponse.forms);
+                } else {
+                    // Show message prompting user to reload page
+                    const container = document.getElementById('formsContainer');
+                    container.innerHTML = `
+                        <div class="no-forms-message">
+                            <p class="no-forms-text">No forms detected on this page.</p>
+                            <p class="reload-message">Please reload the page to detect forms.</p>
+                            <button id="refreshFormsBtn" class="btn btn-secondary">🔄 Try Again</button>
+                        </div>
+                    `;
+                    
+                    document.getElementById('refreshFormsBtn').addEventListener('click', () => {
+                        this.loadDetectedForms();
+                    });
+                }
             }
         } catch (error) {
             const container = document.getElementById('formsContainer');
-            container.innerHTML = '<p class="forms-error-message">Unable to detect forms. Please refresh the page.</p>';
+            container.innerHTML = `
+                <div class="no-forms-message">
+                    <p class="forms-error-message">Unable to connect to the page.</p>
+                    <p class="reload-message">Please reload the page to detect forms.</p>
+                    <button id="refreshFormsBtn" class="btn btn-secondary">🔄 Try Again</button>
+                </div>
+            `;
+            
+            // Add event listener if button exists
+            const refreshBtn = document.getElementById('refreshFormsBtn');
+            if (refreshBtn) {
+                refreshBtn.addEventListener('click', () => {
+                    this.loadDetectedForms();
+                });
+            }
         }
     }
 }

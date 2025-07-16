@@ -360,6 +360,19 @@ body {
     font-size: 13px;
 }
 
+.reload-message {
+    margin: 10px 0;
+    font-size: 12px;
+    color: #888;
+    font-style: italic;
+}
+
+.forms-error-message {
+    margin: 0 0 10px 0;
+    font-size: 13px;
+    color: #d32f2f;
+}
+
 .refresh-forms-btn {
     background: #f0f0f0;
     border: 1px solid #ddd;
