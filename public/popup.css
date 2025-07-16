@@ -415,6 +415,10 @@ body {
     margin: 4px 0;
     color: #666;
     font-size: 13px;
+    word-wrap: break-word;
+    word-break: break-all;
+    overflow-wrap: break-word;
+    white-space: normal;
 }
 
 .form-fields-details {

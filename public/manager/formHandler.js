@@ -57,7 +57,7 @@ export function displayDetectedForms(instance, forms) {
         formElement.innerHTML = `
             <h4 class="form-item-title">Form ${index + 1}</h4>
             <p class="form-item-info">
-                ${form.fieldCount} fields detected | Action: ${form.action || 'Not defined'}
+                ${form.fieldCount} fields detected | URL: ${form.action || 'Not defined'}
             </p>
             <details class="form-fields-details">
                 <summary class="form-fields-summary">View fields</summary>
