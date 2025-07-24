@@ -68,7 +68,7 @@ export function separateMatchedFields(allSuggestions, originalFields, isOpenEnde
     const unmatchedFields = [
         ...allSuggestions.filter(s => s.suggested_value === null || s.suggested_value === undefined || s.suggested_value.toString().trim() === ''),
         ...unprocessedFields.map(field => ({
-            field_name: field.name,
+            field_name: field.name || field.field_name || field.id || `field_unprocessed_${Math.random()}`,
             suggested_value: null,
             field_info: field,
             matched_profile_field: null
@@ -247,7 +247,7 @@ export function generateFieldSuggestions(fields, userProfile, fieldMappings) {
         }
 
         suggestions.push({
-            field_name: field.field_name,
+            field_name: field.name || field.field_name || field.id || `field_${suggestions.length}`,
             suggested_value: suggestedValue,
             field_info: field,
             matched_profile_field: matchedField
