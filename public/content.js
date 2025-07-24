@@ -28,45 +28,154 @@ function getFieldLabel(input) {
   return '';
 }
 
+/**
+ * TIER 1: Detects standard HTML form inputs.
+ * @returns {Array<{label: string, input: HTMLElement}>}
+ */
+function detectStandardInputs() {
+    const matchedFields = [];
+    const inputs = document.querySelectorAll('input:not([type="hidden"]):not([type="submit"]):not([type="button"]):not([type="reset"]):not([type="image"]), textarea, select');
+    
+    inputs.forEach(input => {
+        const label = getFieldLabel(input);
+        if (label || input.placeholder || input.name) {
+            matchedFields.push({ 
+                label: label || input.placeholder || input.name, 
+                input 
+            });
+        }
+    });
+    
+    console.log(`[Tier 1] Detected ${matchedFields.length} standard inputs.`);
+    return matchedFields;
+}
+
+/**
+ * TIER 2: Detects inputs within Google Forms blocks.
+ * @returns {Array<{label: string, input: HTMLElement}>}
+ */
+function detectGoogleFormBlocks() {
+    const matchedFields = [];
+    const blocks = document.querySelectorAll('div[role="listitem"]');
+    
+    if (blocks.length === 0) return [];
+
+    blocks.forEach(block => {
+        const labelElement = block.querySelector('.M7eMe, .freebirdFormviewerViewItemsTextItemWrapper span'); // Common label spans
+        const label = labelElement?.innerText?.trim();
+        const input = block.querySelector('input[type="text"], input[type="email"], textarea, select');
+        
+        if (label && input) {
+            matchedFields.push({ label, input });
+        }
+    });
+    
+    console.log(`[Tier 2] Detected ${matchedFields.length} Google Form fields.`);
+    return matchedFields;
+}
+
+/**
+ * TIER 2: Detects inputs within Typeform blocks.
+ * @returns {Array<{label: string, input: HTMLElement}>}
+ */
+function detectTypeformBlocks() {
+    const matchedFields = [];
+    const blocks = document.querySelectorAll('div[data-qa="question-wrapper"], .typeform-field');
+
+    if (blocks.length === 0) return [];
+
+    blocks.forEach(block => {
+        const labelElement = block.querySelector('label span, [data-qa="title"] span, h1, h2, h3');
+        const label = labelElement?.innerText?.trim();
+        const input = block.querySelector('input, textarea, select');
+        
+        if (label && input) {
+            matchedFields.push({ label, input });
+        }
+    });
+    
+    console.log(`[Tier 2] Detected ${matchedFields.length} Typeform fields.`);
+    return matchedFields;
+}
+
+/**
+ * Removes duplicate fields based on the input element.
+ * @param {Array<{label: string, input: HTMLElement}>} fields - The array of detected fields.
+ * @returns {Array<{label: string, input: HTMLElement}>}
+ */
+function removeDuplicateFields(fields) {
+    const uniqueInputs = new Map();
+    fields.forEach(field => {
+        if (!uniqueInputs.has(field.input)) {
+            uniqueInputs.set(field.input, field);
+        }
+    });
+    return Array.from(uniqueInputs.values());
+}
+
+/**
+ * Unified matching pipeline to detect all form fields on a page.
+ * @returns {Array<{label: string, input: HTMLElement}>}
+ */
+function detectAllFields() {
+    let allFields = [];
+
+    // Tier 1: Standard inputs
+    allFields.push(...detectStandardInputs());
+
+    // Tier 2: Custom form platforms
+    allFields.push(...detectGoogleFormBlocks());
+    allFields.push(...detectTypeformBlocks());
+
+    // Deduplicate and return
+    const uniqueFields = removeDuplicateFields(allFields);
+    console.log(`🔍 Total unique fields detected: ${uniqueFields.length}`);
+    return uniqueFields;
+}
+
 function detectForms() {
-  const forms = document.querySelectorAll("form");
-  if (forms.length === 0) {
+  const allDetectedFields = detectAllFields();
+  if (allDetectedFields.length === 0) {
     detectedFormsCache = [];
     return [];
   }
-  const formResults = [];
-  forms.forEach((form, index) => {
-    const allInputs = form.querySelectorAll("input, textarea, select");
-    const validInputs = Array.from(allInputs).filter(input => 
-      !["hidden", "submit", "button", "reset", "image"].includes(input.type)
-    );
-    if (validInputs.length === 0) {
-      return;
+
+  // Group fields by their parent form
+  const formsMap = new Map();
+  allDetectedFields.forEach(({ label, input }) => {
+    const form = input.closest('form') || document.body; // Fallback to body for formless inputs
+    if (!formsMap.has(form)) {
+      formsMap.set(form, []);
     }
-    const fields = [];
-    validInputs.forEach((input, i) => {
-      const fieldInfo = {
-        index: i + 1,
-        name: input.name || input.id || `field_${i + 1}`,
-        type: input.type || input.tagName.toLowerCase(),
-        label: getFieldLabel(input),
-        placeholder: input.placeholder || '',
-        required: input.required,
-        value: input.value,
-        id: input.id,
-        className: input.className,
-        maxLength: input.maxLength > 0 ? input.maxLength : null
-      };
-      fields.push(fieldInfo);
-    });
-    formResults.push({
-      formIndex: index,
-      fields,
-      action: form.action || window.location.href,
-      method: form.method || "GET",
-      fieldCount: fields.length
-    });
+    formsMap.get(form).push({ label, input });
   });
+
+  const formResults = [];
+  let formIndex = 0;
+  formsMap.forEach((fields, formElement) => {
+    const formFields = fields.map(({ label, input }, i) => ({
+      index: i + 1,
+      name: input.name || input.id || `field_${i + 1}`,
+      type: input.type || input.tagName.toLowerCase(),
+      label: label,
+      placeholder: input.placeholder || '',
+      required: input.required,
+      value: input.value,
+      id: input.id,
+      className: input.className,
+      maxLength: input.maxLength > 0 ? input.maxLength : null,
+    }));
+
+    formResults.push({
+      formIndex: formIndex,
+      fields: formFields,
+      action: formElement.action || window.location.href,
+      method: formElement.method || "GET",
+      fieldCount: formFields.length,
+    });
+    formIndex++;
+  });
+
   detectedFormsCache = formResults;
   
   // Show notification instantly if forms are detected and counts have changed
@@ -804,10 +913,11 @@ async function processAndFillAIFields(form, aiFields, userProfile, aiServerUrl) 
     if (aiFields.length === 0) return 0;
     
     // Start AI processing
-    updateAIProgress('🤖 Démarrage requête IA...', 10);
+    updateAIProgress('🤖 Démarrage requête IA...', 15);
     
+    // Reduced timeout for faster failure
     const timeoutPromise = new Promise(resolve => 
-      setTimeout(() => resolve({ suggestions: [], timedOut: true }), 10000)
+      setTimeout(() => resolve({ suggestions: [], timedOut: true }), 15000)  // Reduced from 15000
     );
     
     const aiPromise = handleAILogic(userProfile, aiFields, aiServerUrl);

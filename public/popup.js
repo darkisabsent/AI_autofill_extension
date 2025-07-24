@@ -219,6 +219,10 @@ class PopupManager {
         fillForm(this, formIndex);
     }
 
+    async getAISuggestions(userProfile, aiRelevantFields) {
+        return getAISuggestions(this, userProfile, aiRelevantFields);
+    }
+
     async loadFieldMappings() {
         try {
             const response = await fetch('field-mappings.json');
