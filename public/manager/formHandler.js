@@ -107,34 +107,21 @@ export async function fillForm(instance, formIndex) {
         console.log('🔍 All field suggestions generated:', allSuggestions.map(s => ({
             field: s.field_name,
             suggested: s.suggested_value,
-            matched: s.matched_profile_field
+            matched: s.matched_profile_field,
+            source: s.source
         })));
         
-        const { matchedFields, unmatchedFields } = separateMatchedFields(allSuggestions, formData.fields, (field) => isOpenEndedQuestion(field));
-        
-        // Check for AI-relevant fields (open-ended questions)
-        const aiRelevantFields = unmatchedFields.filter(field => isOpenEndedQuestion(field.field_info));
-        
-        let allFieldsToFill = [...matchedFields];
-        
-        // If there are AI-relevant fields, prepare them for AI processing
-        if (aiRelevantFields.length > 0) {
-            console.log('🤖 Found AI-relevant fields:', aiRelevantFields.map(f => f.field_name));
-            
-            // Add AI fields to the list with placeholder data - they'll be processed in content script
-            const aiFieldsForProcessing = aiRelevantFields.map(field => ({
-                field_name: field.field_name,
-                suggested_value: null, // Will be filled by AI
-                field_info: field.field_info,
-                matched_profile_field: 'ai_generated',
-                source: 'ai'
+        // The new generateFieldSuggestions already categorizes fields by source
+        const allFieldsToFill = allSuggestions
+            .filter(s => s.source === 'profile' || s.source === 'ai')
+            .map(s => ({
+                ...s,
+                // Ensure suggested_value is null for AI fields so content script knows to generate it
+                suggested_value: s.source === 'ai' ? null : s.suggested_value
             }));
-            
-            allFieldsToFill = [...matchedFields, ...aiFieldsForProcessing];
-        }
-        
+
         if (!allFieldsToFill.length) {
-            displayMessage('No matching fields found');
+            displayMessage('No matching fields found to fill.');
             return;
         }
         
