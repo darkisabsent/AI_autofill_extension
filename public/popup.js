@@ -9,7 +9,6 @@ import { FIELD_MAPPINGS } from './utils/constants.js';
 import { handleLogin, handleRegister, handleProfileSubmit, handleLogout } from './manager/authHandler.js';
 import { detectForms, displayDetectedForms, fillForm } from './manager/formHandler.js';
 import { loadCountries } from './manager/dropdownHandler.js';
-import { getAISuggestions } from './manager/aiHandler.js';
 import { showTab, toggleSection, showAuthSection, showProfileSection, showUserSection, hideAllSections, showMessage, clearMessages, displayMessage } from './utils/domUtils.js';
 
 class PopupManager {
@@ -218,10 +217,6 @@ class PopupManager {
 
     async fillForm(formIndex) {
         fillForm(this, formIndex);
-    }
-
-    async getAISuggestions(userProfile, aiRelevantFields) {
-        return getAISuggestions(this, userProfile, aiRelevantFields);
     }
 
     async loadFieldMappings() {

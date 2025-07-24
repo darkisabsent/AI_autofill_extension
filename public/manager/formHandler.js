@@ -4,7 +4,6 @@ import {
     isOpenEndedQuestion
 } from '../utils/formUtils.js';
 import { displayMessage } from '../utils/domUtils.js';
-import { getAISuggestions } from './aiHandler.js';
 
 export async function detectForms(instance) {
     try {
@@ -111,21 +110,43 @@ export async function fillForm(instance, formIndex) {
             matched: s.matched_profile_field
         })));
         
-        const { matchedFields } = separateMatchedFields(allSuggestions, formData.fields, (field) => isOpenEndedQuestion(field));
+        const { matchedFields, unmatchedFields } = separateMatchedFields(allSuggestions, formData.fields, (field) => isOpenEndedQuestion(field));
         
-        if (!matchedFields.length) {
+        // Check for AI-relevant fields (open-ended questions)
+        const aiRelevantFields = unmatchedFields.filter(field => isOpenEndedQuestion(field.field_info));
+        
+        let allFieldsToFill = [...matchedFields];
+        
+        // If there are AI-relevant fields, prepare them for AI processing
+        if (aiRelevantFields.length > 0) {
+            console.log('🤖 Found AI-relevant fields:', aiRelevantFields.map(f => f.field_name));
+            
+            // Add AI fields to the list with placeholder data - they'll be processed in content script
+            const aiFieldsForProcessing = aiRelevantFields.map(field => ({
+                field_name: field.field_name,
+                suggested_value: null, // Will be filled by AI
+                field_info: field.field_info,
+                matched_profile_field: 'ai_generated',
+                source: 'ai'
+            }));
+            
+            allFieldsToFill = [...matchedFields, ...aiFieldsForProcessing];
+        }
+        
+        if (!allFieldsToFill.length) {
             displayMessage('No matching fields found');
             return;
         }
         
-        // Send all data to content script to handle the entire filling process
+        // Send all data to content script to handle the entire filling process including AI
         const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
         await chrome.tabs.sendMessage(tab.id, {
             action: 'fillFormComplete',
             formIndex: formIndex,
-            matchedFields: matchedFields,
+            matchedFields: allFieldsToFill,
             userProfile: userProfile,
-            totalFields: matchedFields.length
+            totalFields: allFieldsToFill.length,
+            aiServerUrl: 'http://localhost:5001/api/analyze'
         });
         
         // Show success message in popup
