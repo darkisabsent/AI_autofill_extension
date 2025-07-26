@@ -148,7 +148,6 @@ class PopupManager {
         document.getElementById('toggleStartupSectionBtn').addEventListener('click', () => {
             toggleSection('startup');
         });
-        // Remove detect forms button listener since we auto-load
         document.getElementById('loginTabBtn').addEventListener('click', () => {
             showTab('login');
         });
@@ -310,12 +309,10 @@ class PopupManager {
             if (response && response.forms && response.forms.length > 0) {
                 this.displayDetectedForms(response.forms);
             } else {
-                // If no cached forms, try to detect them
                 const detectResponse = await chrome.tabs.sendMessage(tab.id, { action: 'detectForms' });
                 if (detectResponse && detectResponse.forms && detectResponse.forms.length > 0) {
                     this.displayDetectedForms(detectResponse.forms);
                 } else {
-                    // Show message prompting user to reload page
                     const container = document.getElementById('formsContainer');
                     container.innerHTML = `
                         <div class="no-forms-message">
@@ -340,7 +337,6 @@ class PopupManager {
                 </div>
             `;
             
-            // Add event listener if button exists
             const refreshBtn = document.getElementById('refreshFormsBtn');
             if (refreshBtn) {
                 refreshBtn.addEventListener('click', () => {

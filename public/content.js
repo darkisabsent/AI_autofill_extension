@@ -28,10 +28,6 @@ function getFieldLabel(input) {
   return '';
 }
 
-/**
- * TIER 1: Detects standard HTML form inputs.
- * @returns {Array<{label: string, input: HTMLElement}>}
- */
 function detectStandardInputs() {
     const matchedFields = [];
     const inputs = document.querySelectorAll('input:not([type="hidden"]):not([type="submit"]):not([type="button"]):not([type="reset"]):not([type="image"]), textarea, select');
@@ -46,14 +42,9 @@ function detectStandardInputs() {
         }
     });
     
-    console.log(`[Tier 1] Detected ${matchedFields.length} standard inputs.`);
     return matchedFields;
 }
 
-/**
- * TIER 2: Detects inputs within Google Forms blocks.
- * @returns {Array<{label: string, input: HTMLElement}>}
- */
 function detectGoogleFormBlocks() {
     const matchedFields = [];
     const blocks = document.querySelectorAll('div[role="listitem"]');
@@ -61,7 +52,7 @@ function detectGoogleFormBlocks() {
     if (blocks.length === 0) return [];
 
     blocks.forEach(block => {
-        const labelElement = block.querySelector('.M7eMe, .freebirdFormviewerViewItemsTextItemWrapper span'); // Common label spans
+        const labelElement = block.querySelector('.M7eMe, .freebirdFormviewerViewItemsTextItemWrapper span');
         const label = labelElement?.innerText?.trim();
         const input = block.querySelector('input[type="text"], input[type="email"], textarea, select');
         
@@ -70,14 +61,9 @@ function detectGoogleFormBlocks() {
         }
     });
     
-    console.log(`[Tier 2] Detected ${matchedFields.length} Google Form fields.`);
     return matchedFields;
 }
 
-/**
- * TIER 2: Detects inputs within Typeform blocks.
- * @returns {Array<{label: string, input: HTMLElement}>}
- */
 function detectTypeformBlocks() {
     const matchedFields = [];
     const blocks = document.querySelectorAll('div[data-qa="question-wrapper"], .typeform-field');
@@ -94,15 +80,9 @@ function detectTypeformBlocks() {
         }
     });
     
-    console.log(`[Tier 2] Detected ${matchedFields.length} Typeform fields.`);
     return matchedFields;
 }
 
-/**
- * Removes duplicate fields based on the input element.
- * @param {Array<{label: string, input: HTMLElement}>} fields - The array of detected fields.
- * @returns {Array<{label: string, input: HTMLElement}>}
- */
 function removeDuplicateFields(fields) {
     const uniqueInputs = new Map();
     fields.forEach(field => {
@@ -113,23 +93,14 @@ function removeDuplicateFields(fields) {
     return Array.from(uniqueInputs.values());
 }
 
-/**
- * Unified matching pipeline to detect all form fields on a page.
- * @returns {Array<{label: string, input: HTMLElement}>}
- */
 function detectAllFields() {
     let allFields = [];
 
-    // Tier 1: Standard inputs
     allFields.push(...detectStandardInputs());
-
-    // Tier 2: Custom form platforms
     allFields.push(...detectGoogleFormBlocks());
     allFields.push(...detectTypeformBlocks());
 
-    // Deduplicate and return
     const uniqueFields = removeDuplicateFields(allFields);
-    console.log(`🔍 Total unique fields detected: ${uniqueFields.length}`);
     return uniqueFields;
 }
 
@@ -140,10 +111,9 @@ function detectForms() {
     return [];
   }
 
-  // Group fields by their parent form
   const formsMap = new Map();
   allDetectedFields.forEach(({ label, input }) => {
-    const form = input.closest('form') || document.body; // Fallback to body for formless inputs
+    const form = input.closest('form') || document.body; 
     if (!formsMap.has(form)) {
       formsMap.set(form, []);
     }
@@ -178,7 +148,6 @@ function detectForms() {
 
   detectedFormsCache = formResults;
   
-  // Show notification instantly if forms are detected and counts have changed
   if (formResults.length > 0) {
     const totalFields = formResults.reduce((sum, form) => sum + form.fieldCount, 0);
     if (!isNotificationVisible && (formResults.length !== lastFormCount || totalFields !== lastFieldCount)) {
@@ -192,23 +161,16 @@ function detectForms() {
 }
 
 function showFormDetectionNotification(forms) {
-  // Prevent multiple notifications
-  if (isNotificationVisible) {
-    return;
-  }
+  if (isNotificationVisible) return;
   
-  // Remove existing notification if any
   const existingNotification = document.getElementById('autofill-form-notification');
-  if (existingNotification) {
-    existingNotification.remove();
-  }
+  if (existingNotification) existingNotification.remove();
 
   isNotificationVisible = true;
   const totalFields = forms.reduce((sum, form) => sum + form.fieldCount, 0);
   const formText = forms.length === 1 ? 'form' : 'forms';
   const fieldText = totalFields === 1 ? 'field' : 'fields';
   
-  // Create lightweight notification
   const notification = document.createElement('div');
   notification.id = 'autofill-form-notification';
   notification.style.cssText = `
@@ -250,7 +212,6 @@ function showFormDetectionNotification(forms) {
   
   document.body.appendChild(notification);
   
-  // Add click handler for close button
   const closeBtn = notification.querySelector('#autofill-notification-close');
   if (closeBtn) {
     closeBtn.onclick = (e) => {
@@ -262,12 +223,8 @@ function showFormDetectionNotification(forms) {
     closeBtn.onmouseleave = () => closeBtn.style.opacity = '0.8';
   }
   
-  // Clear any existing timeout
-  if (notificationTimeout) {
-    clearTimeout(notificationTimeout);
-  }
+  if (notificationTimeout) clearTimeout(notificationTimeout);
   
-  // Auto-hide after 4 seconds
   notificationTimeout = setTimeout(() => {
     hideNotification(notification);
   }, 4000);
@@ -279,13 +236,11 @@ function hideNotification(notification) {
     return;
   }
   
-  // Clear timeout
   if (notificationTimeout) {
     clearTimeout(notificationTimeout);
     notificationTimeout = null;
   }
   
-  // Simple fade out
   notification.style.opacity = '0';
   
   setTimeout(() => {
@@ -296,17 +251,16 @@ function hideNotification(notification) {
   }, 200);
 }
 
-// Instant detection when page loads
+// Initialize form detection
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", detectForms);
 } else {
   detectForms();
 }
 
-// Optimized mutation observer
+// Watch for new forms being added to the page
 let detectionTimeout;
 const observer = new MutationObserver((mutations) => {
-  // Quick check for form-related changes
   let shouldDetect = false;
   for (const mutation of mutations) {
     if (mutation.type === 'childList') {
@@ -336,9 +290,7 @@ function createFillingOverlay() {
   aiAbortController = new AbortController();
   
   const existingOverlay = document.getElementById('autofill-filling-overlay');
-  if (existingOverlay) {
-    existingOverlay.remove();
-  }
+  if (existingOverlay) existingOverlay.remove();
 
   const overlay = document.createElement('div');
   overlay.id = 'autofill-filling-overlay';
@@ -362,7 +314,6 @@ function createFillingOverlay() {
       <h3 class="autofill-content-title">🤖 AutoFill AI en cours</h3>
       <p class="autofill-content-description">Remplissage automatique du formulaire...</p>
       
-      <!-- Profile Progress Section -->
       <div class="autofill-progress-section">
         <p class="autofill-progress-label">👤 Remplissage du profil</p>
         <div id="filling-progress" class="autofill-content-progress">
@@ -371,7 +322,6 @@ function createFillingOverlay() {
         <p id="filling-progress-text" class="autofill-content-progress-text">0 / 0 champs remplis</p>
       </div>
 
-      <!-- AI Progress Section -->
       <div id="ai-progress-section" class="autofill-progress-section" style="display: none;">
         <p class="autofill-progress-label">🤖 Génération IA</p>
         <div id="ai-filling-progress" class="autofill-content-progress">
@@ -390,28 +340,21 @@ function createFillingOverlay() {
 
   document.body.appendChild(overlay);
 
-  // Cancel button functionality
   document.getElementById('autofill-cancel-btn').addEventListener('click', () => {
     isFillingCancelled = true;
-    if (aiAbortController) {
-      aiAbortController.abort();
-    }
-    console.log('🚫 Filling process cancelled by user.');
+    if (aiAbortController) aiAbortController.abort();
     updateFillingProgress('Remplissage annulé par l\'utilisateur.');
     removeFillingOverlay();
   });
   
-  // Prevent all interaction with the page content
+  // Prevent interaction with page content
   overlay.addEventListener('click', (e) => e.stopPropagation());
   overlay.addEventListener('mousedown', (e) => e.stopPropagation());
   overlay.addEventListener('keydown', (e) => e.stopPropagation());
   overlay.addEventListener('touchstart', (e) => e.stopPropagation(), { passive: false });
   overlay.addEventListener('wheel', (e) => e.preventDefault(), { passive: false });
   
-  // Prevent scrolling on the body when overlay is active
   document.body.style.overflow = 'hidden';
-  
-  // Force a reflow to ensure animations and transitions work correctly
   void overlay.offsetWidth;
 
   return overlay;
@@ -424,9 +367,7 @@ function updateFillingProgress(message, current = null, total = null) {
   const progressBar = document.getElementById('progress-bar');
   const progressText = document.getElementById('filling-progress-text');
   
-  if (statusElement) {
-    statusElement.textContent = message;
-  }
+  if (statusElement) statusElement.textContent = message;
   
   if (current !== null && total !== null) {
     if (progressText) {
@@ -435,7 +376,6 @@ function updateFillingProgress(message, current = null, total = null) {
     if (progressBar && total > 0) {
       const percentage = Math.min(100, Math.round((current / total) * 100));
       
-      // Force reflow and apply styles with !important
       progressBar.offsetHeight;
       progressBar.style.cssText = `
         width: ${percentage}% !important;
@@ -459,7 +399,6 @@ function updateAIProgress(message, percentage) {
   if (aiSection) aiSection.style.display = 'block';
   if (aiStatus) aiStatus.textContent = message;
   if (aiProgressBar) {
-    // Force reflow and apply styles with !important
     aiProgressBar.offsetHeight;
     aiProgressBar.style.cssText = `
       width: ${percentage}% !important;
@@ -472,11 +411,8 @@ function updateAIProgress(message, percentage) {
   }
 }
 
-// Add autofill styles to the page
 function addAutofillStyles() {
-  if (document.getElementById('autofill-styles')) {
-    return;
-  }
+  if (document.getElementById('autofill-styles')) return;
   
   const styles = document.createElement('style');
   styles.id = 'autofill-styles';
@@ -577,7 +513,6 @@ function addAutofillStyles() {
   document.head.appendChild(styles);
 }
 
-// Initialize styles when content script loads
 addAutofillStyles();
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -596,7 +531,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
   if (message.action === "fillFormComplete") {
-    // Handle complete form filling process with overlay
     handleCompleteFormFilling(message.formIndex, message.matchedFields, message.userProfile, message.totalFields, message.aiServerUrl);
     sendResponse({ success: true });
     return true;
@@ -607,20 +541,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       .catch(error => sendResponse({ success: false, error: error.message }));
     return true;
   }
-  
 });
 
 function fillFormWithSuggestions(formIndex, suggestions, isAIFilling = false) {
   const forms = document.querySelectorAll("form");
   if (formIndex >= forms.length) {
-    console.warn(`Form index ${formIndex} not found`);
     return;
   }
   
   const form = forms[formIndex];
   const formInputs = form.querySelectorAll("input, textarea, select");
-  
-  console.log(`Filling ${suggestions.length} suggestions (AI: ${isAIFilling})`);
   
   if (isAIFilling) {
     updateFillingProgress('🤖 Applying AI suggestions...');
@@ -636,7 +566,6 @@ function fillFormWithSuggestions(formIndex, suggestions, isAIFilling = false) {
     setTimeout(() => {
       let targetInput = null;
       
-      // Try multiple ways to find the target input
       targetInput = form.querySelector(`[name="${suggestion.field_name}"]`);
       if (!targetInput) {
         targetInput = form.querySelector(`#${suggestion.field_name}`);
@@ -656,7 +585,7 @@ function fillFormWithSuggestions(formIndex, suggestions, isAIFilling = false) {
         const source = suggestion.source === 'ai' ? '🤖 AI' : '👤 Profile';
         updateFillingProgress(`${source}: ${fieldLabel}...`);
         
-        // Fill the field based on its type
+        // Fill field based on type
         if (targetInput.tagName.toLowerCase() === 'select') {
           const options = Array.from(targetInput.options);
           const exactMatch = options.find(option => 
@@ -692,13 +621,9 @@ function fillFormWithSuggestions(formIndex, suggestions, isAIFilling = false) {
           targetInput.classList.remove('autofill-filled');
         }, 2000);
         
-        console.log(`✅ Filled: ${fieldLabel} = "${suggestion.suggested_value}" (${suggestion.source})`);
         filledCount++;
-      } else {
-        console.warn(`❌ Could not find field: ${suggestion.field_name}`);
       }
       
-      // Update progress for the last suggestion
       if (index === suggestions.length - 1) {
         setTimeout(() => {
           const sourceText = isAIFilling ? '🤖 AI' : '👤 Profile';
@@ -710,12 +635,11 @@ function fillFormWithSuggestions(formIndex, suggestions, isAIFilling = false) {
   });
 }
 
-// Add AI logic function
+// AI logic handler
 async function handleAILogic(userProfile, aiRelevantFields, aiServerUrl) {
   if (isFillingCancelled) return { suggestions: [], timedOut: false };
   
   try {
-    console.log('🤖 Starting AI request for fields:', aiRelevantFields);
     updateAIProgress('Envoi à l\'IA...', 50);
     
     const aiPayload = {
@@ -744,8 +668,6 @@ async function handleAILogic(userProfile, aiRelevantFields, aiServerUrl) {
       }))
     };
     
-    console.log('📤 AI payload prepared:', aiPayload);
-    
     const response = await fetch(aiServerUrl, {
       method: 'POST',
       headers: {
@@ -760,10 +682,9 @@ async function handleAILogic(userProfile, aiRelevantFields, aiServerUrl) {
     }
     
     const aiResults = await response.json();
-    console.log('📋 Raw AI results:', aiResults);
     updateAIProgress('Réponse IA reçue', 75);
     
-    // Handle the specific response format: [{'field_name': 'skills', 'suggested_value': '...'}]
+    // Handle response format: [{'field_name': 'skills', 'suggested_value': '...'}]
     let processedResults = [];
     
     if (Array.isArray(aiResults)) {
@@ -788,17 +709,15 @@ async function handleAILogic(userProfile, aiRelevantFields, aiServerUrl) {
       };
     }).filter(suggestion => suggestion.suggested_value && suggestion.suggested_value.trim());
     
-    console.log(`✅ Final AI suggestions (${aiSuggestions.length}):`, aiSuggestions);
     updateAIProgress('Suggestions IA traitées', 100);
     return { suggestions: aiSuggestions, timedOut: false };
     
   } catch (error) {
     if (error.name === 'AbortError') {
-      console.log('🚫 AI request aborted');
       return { suggestions: [], timedOut: false };
     }
     
-    console.error("❌ AI suggestion error:", error.message);
+    console.error("AI suggestion error:", error.message);
     if (error.message.includes('Failed to fetch') || error.message.includes('ERR_CONNECTION_REFUSED')) {
       updateAIProgress('Serveur IA indisponible', 0);
     } else {
@@ -808,7 +727,7 @@ async function handleAILogic(userProfile, aiRelevantFields, aiServerUrl) {
   }
 }
 
-// Field filling helper functions
+// Field filling utilities
 function findFieldInForm(form, field) {
   let targetInput = form.querySelector(`[name="${field.field_name}"]`);
   if (!targetInput) targetInput = form.querySelector(`#${field.field_name}`);
@@ -873,7 +792,6 @@ function removeFillingOverlay() {
     }, 300);
   }
   
-  // Clean up abort controller
   if (aiAbortController) {
     aiAbortController = null;
   }
@@ -894,9 +812,6 @@ async function fillProfileFields(form, profileFields) {
     if (targetInput) {
       fillSingleField(targetInput, field, 'profile');
       successCount++;
-      console.log(`✅ Profile field filled: ${progressFieldName}`);
-    } else {
-      console.warn(`❌ Could not find profile field: ${field.field_name}`);
     }
     
     await new Promise(resolve => setTimeout(resolve, 200));
@@ -912,18 +827,15 @@ async function processAndFillAIFields(form, aiFields, userProfile, aiServerUrl) 
   try {
     if (aiFields.length === 0) return 0;
     
-    // Start AI processing
     updateAIProgress('🤖 Démarrage requête IA...', 15);
     
-    // Reduced timeout for faster failure
     const timeoutPromise = new Promise(resolve => 
-      setTimeout(() => resolve({ suggestions: [], timedOut: true }), 15000)  // Reduced from 15000
+      setTimeout(() => resolve({ suggestions: [], timedOut: true }), 15000) 
     );
     
     const aiPromise = handleAILogic(userProfile, aiFields, aiServerUrl);
     
     const aiResult = await Promise.race([aiPromise, timeoutPromise]).catch(err => {
-      console.warn("⚠️ AI Timeout or error:", err.message);
       updateAIProgress("IA indisponible", 0);
       return { suggestions: [], timedOut: true, error: err };
     });
@@ -931,7 +843,6 @@ async function processAndFillAIFields(form, aiFields, userProfile, aiServerUrl) 
     if (isFillingCancelled) return 0;
     
     if (aiResult.timedOut) {
-      console.warn('⌛️ AI request timed out after 10 seconds');
       updateAIProgress('⌛️ Délai IA dépassé', 0);
       return 0;
     } else if (aiResult.suggestions && aiResult.suggestions.length > 0) {
@@ -942,15 +853,10 @@ async function processAndFillAIFields(form, aiFields, userProfile, aiServerUrl) 
         if (isFillingCancelled) break;
         
         const field = aiResult.suggestions[i];
-        const progressFieldName = field.field_info?.label || field.field_info?.placeholder || field.field_name || `Champ AI ${i + 1}`;
-        
         const targetInput = findFieldInForm(form, field);
         if (targetInput) {
           fillSingleField(targetInput, field, 'ai');
           successCount++;
-          console.log(`✅ AI field filled: ${progressFieldName}`);
-        } else {
-          console.warn(`❌ Could not find AI field: ${field.field_name}`);
         }
         
         await new Promise(resolve => setTimeout(resolve, 300));
@@ -958,22 +864,19 @@ async function processAndFillAIFields(form, aiFields, userProfile, aiServerUrl) 
       
       updateAIProgress(`🤖 IA terminée: ${successCount} champs`, 100);
     } else if (aiResult.error) {
-      console.log('ℹ️ AI suggestions skipped due to error');
       updateAIProgress('❌ Erreur IA', 0);
     }
   } catch (error) {
-    console.error('❌ AI processing error:', error);
+    console.error('AI processing error:', error);
     updateAIProgress('❌ Erreur IA', 0);
   }
   
   return successCount;
 }
 
-// Main form filling orchestrator with TRUE parallel workflow
+// Main form filling orchestrator - parallel workflow
 async function handleCompleteFormFilling(formIndex, matchedFields, userProfile, totalFields, aiServerUrl) {
   try {
-    console.log('🎯 Starting TRUE parallel form filling process');
-    
     createFillingOverlay();
     await new Promise(resolve => setTimeout(resolve, 300));
     
@@ -1003,36 +906,10 @@ async function handleCompleteFormFilling(formIndex, matchedFields, userProfile, 
     updateFillingProgress(`✅ Formulaire rempli! ${totalSuccess}/${totalFields} champs (👤${profileSuccessCount} + 🤖${aiSuccessCount})`, totalFields, totalFields);
     
     setTimeout(removeFillingOverlay, 2500);
-    console.log(`🎉 Parallel form filling completed! Profile: ${profileSuccessCount}, AI: ${aiSuccessCount}`);
     
   } catch (error) {
-    console.error('❌ Form filling error:', error);
+    console.error('Form filling error:', error);
     updateFillingProgress('❌ Erreur lors du remplissage', 0, totalFields);
     setTimeout(removeFillingOverlay, 3000);
   }
-}
-
-// Debug function to log field details
-function logFieldDebugInfo(fields, userProfile) {
-  console.log('🔍 Debug: All detected fields:', fields.map(f => ({
-    name: f.name,
-    label: f.label,
-    type: f.type,
-    placeholder: f.placeholder
-  })));
-  
-  // Check specifically for potential birth date fields
-  const potentialBirthFields = fields.filter(f => {
-    const identifiers = [f.label, f.name, f.placeholder].filter(Boolean).map(s => s.toLowerCase());
-    return identifiers.some(id => 
-      id.includes('birth') || id.includes('naissance') || id.includes('age') || 
-      id.includes('âge') || id.includes('né') || id.includes('born')
-    );
-  });
-  
-  if (potentialBirthFields.length > 0) {
-    console.log('🎂 Potential birth date fields found:', potentialBirthFields);
-  }
-  
-  console.log('👤 User profile birth date:', userProfile.profile?.dateOfBirth);
 }
