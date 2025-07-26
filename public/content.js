@@ -3,6 +3,8 @@ let notificationTimeout;
 let isNotificationVisible = false;
 let lastFormCount = 0;
 let lastFieldCount = 0;
+let isFillingCancelled = false;
+let aiAbortController = null;
 
 function getFieldLabel(input) {
   if (input.id) {
@@ -26,48 +28,126 @@ function getFieldLabel(input) {
   return '';
 }
 
+function detectStandardInputs() {
+    const matchedFields = [];
+    const inputs = document.querySelectorAll('input:not([type="hidden"]):not([type="submit"]):not([type="button"]):not([type="reset"]):not([type="image"]), textarea, select');
+    
+    inputs.forEach(input => {
+        const label = getFieldLabel(input);
+        if (label || input.placeholder || input.name) {
+            matchedFields.push({ 
+                label: label || input.placeholder || input.name, 
+                input 
+            });
+        }
+    });
+    
+    return matchedFields;
+}
+
+function detectGoogleFormBlocks() {
+    const matchedFields = [];
+    const blocks = document.querySelectorAll('div[role="listitem"]');
+    
+    if (blocks.length === 0) return [];
+
+    blocks.forEach(block => {
+        const labelElement = block.querySelector('.M7eMe, .freebirdFormviewerViewItemsTextItemWrapper span');
+        const label = labelElement?.innerText?.trim();
+        const input = block.querySelector('input[type="text"], input[type="email"], textarea, select');
+        
+        if (label && input) {
+            matchedFields.push({ label, input });
+        }
+    });
+    
+    return matchedFields;
+}
+
+function detectTypeformBlocks() {
+    const matchedFields = [];
+    const blocks = document.querySelectorAll('div[data-qa="question-wrapper"], .typeform-field');
+
+    if (blocks.length === 0) return [];
+
+    blocks.forEach(block => {
+        const labelElement = block.querySelector('label span, [data-qa="title"] span, h1, h2, h3');
+        const label = labelElement?.innerText?.trim();
+        const input = block.querySelector('input, textarea, select');
+        
+        if (label && input) {
+            matchedFields.push({ label, input });
+        }
+    });
+    
+    return matchedFields;
+}
+
+function removeDuplicateFields(fields) {
+    const uniqueInputs = new Map();
+    fields.forEach(field => {
+        if (!uniqueInputs.has(field.input)) {
+            uniqueInputs.set(field.input, field);
+        }
+    });
+    return Array.from(uniqueInputs.values());
+}
+
+function detectAllFields() {
+    let allFields = [];
+
+    allFields.push(...detectStandardInputs());
+    allFields.push(...detectGoogleFormBlocks());
+    allFields.push(...detectTypeformBlocks());
+
+    const uniqueFields = removeDuplicateFields(allFields);
+    return uniqueFields;
+}
+
 function detectForms() {
-  const forms = document.querySelectorAll("form");
-  if (forms.length === 0) {
+  const allDetectedFields = detectAllFields();
+  if (allDetectedFields.length === 0) {
     detectedFormsCache = [];
     return [];
   }
-  const formResults = [];
-  forms.forEach((form, index) => {
-    const allInputs = form.querySelectorAll("input, textarea, select");
-    const validInputs = Array.from(allInputs).filter(input => 
-      !["hidden", "submit", "button", "reset", "image"].includes(input.type)
-    );
-    if (validInputs.length === 0) {
-      return;
+
+  const formsMap = new Map();
+  allDetectedFields.forEach(({ label, input }) => {
+    const form = input.closest('form') || document.body; 
+    if (!formsMap.has(form)) {
+      formsMap.set(form, []);
     }
-    const fields = [];
-    validInputs.forEach((input, i) => {
-      const fieldInfo = {
-        index: i + 1,
-        name: input.name || input.id || `field_${i + 1}`,
-        type: input.type || input.tagName.toLowerCase(),
-        label: getFieldLabel(input),
-        placeholder: input.placeholder || '',
-        required: input.required,
-        value: input.value,
-        id: input.id,
-        className: input.className,
-        maxLength: input.maxLength > 0 ? input.maxLength : null
-      };
-      fields.push(fieldInfo);
-    });
-    formResults.push({
-      formIndex: index,
-      fields,
-      action: form.action || window.location.href,
-      method: form.method || "GET",
-      fieldCount: fields.length
-    });
+    formsMap.get(form).push({ label, input });
   });
+
+  const formResults = [];
+  let formIndex = 0;
+  formsMap.forEach((fields, formElement) => {
+    const formFields = fields.map(({ label, input }, i) => ({
+      index: i + 1,
+      name: input.name || input.id || `field_${i + 1}`,
+      type: input.type || input.tagName.toLowerCase(),
+      label: label,
+      placeholder: input.placeholder || '',
+      required: input.required,
+      value: input.value,
+      id: input.id,
+      className: input.className,
+      maxLength: input.maxLength > 0 ? input.maxLength : null,
+    }));
+
+    formResults.push({
+      formIndex: formIndex,
+      fields: formFields,
+      action: formElement.action || window.location.href,
+      method: formElement.method || "GET",
+      fieldCount: formFields.length,
+    });
+    formIndex++;
+  });
+
   detectedFormsCache = formResults;
   
-  // Show notification instantly if forms are detected and counts have changed
   if (formResults.length > 0) {
     const totalFields = formResults.reduce((sum, form) => sum + form.fieldCount, 0);
     if (!isNotificationVisible && (formResults.length !== lastFormCount || totalFields !== lastFieldCount)) {
@@ -81,23 +161,16 @@ function detectForms() {
 }
 
 function showFormDetectionNotification(forms) {
-  // Prevent multiple notifications
-  if (isNotificationVisible) {
-    return;
-  }
+  if (isNotificationVisible) return;
   
-  // Remove existing notification if any
   const existingNotification = document.getElementById('autofill-form-notification');
-  if (existingNotification) {
-    existingNotification.remove();
-  }
+  if (existingNotification) existingNotification.remove();
 
   isNotificationVisible = true;
   const totalFields = forms.reduce((sum, form) => sum + form.fieldCount, 0);
   const formText = forms.length === 1 ? 'form' : 'forms';
   const fieldText = totalFields === 1 ? 'field' : 'fields';
   
-  // Create lightweight notification
   const notification = document.createElement('div');
   notification.id = 'autofill-form-notification';
   notification.style.cssText = `
@@ -139,7 +212,6 @@ function showFormDetectionNotification(forms) {
   
   document.body.appendChild(notification);
   
-  // Add click handler for close button
   const closeBtn = notification.querySelector('#autofill-notification-close');
   if (closeBtn) {
     closeBtn.onclick = (e) => {
@@ -151,12 +223,8 @@ function showFormDetectionNotification(forms) {
     closeBtn.onmouseleave = () => closeBtn.style.opacity = '0.8';
   }
   
-  // Clear any existing timeout
-  if (notificationTimeout) {
-    clearTimeout(notificationTimeout);
-  }
+  if (notificationTimeout) clearTimeout(notificationTimeout);
   
-  // Auto-hide after 4 seconds
   notificationTimeout = setTimeout(() => {
     hideNotification(notification);
   }, 4000);
@@ -168,13 +236,11 @@ function hideNotification(notification) {
     return;
   }
   
-  // Clear timeout
   if (notificationTimeout) {
     clearTimeout(notificationTimeout);
     notificationTimeout = null;
   }
   
-  // Simple fade out
   notification.style.opacity = '0';
   
   setTimeout(() => {
@@ -185,17 +251,16 @@ function hideNotification(notification) {
   }, 200);
 }
 
-// Instant detection when page loads
+// Initialize form detection
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", detectForms);
 } else {
   detectForms();
 }
 
-// Optimized mutation observer
+// Watch for new forms being added to the page
 let detectionTimeout;
 const observer = new MutationObserver((mutations) => {
-  // Quick check for form-related changes
   let shouldDetect = false;
   for (const mutation of mutations) {
     if (mutation.type === 'childList') {
@@ -221,10 +286,11 @@ observer.observe(document.body, {
 });
 
 function createFillingOverlay() {
+  isFillingCancelled = false;
+  aiAbortController = new AbortController();
+  
   const existingOverlay = document.getElementById('autofill-filling-overlay');
-  if (existingOverlay) {
-    existingOverlay.remove();
-  }
+  if (existingOverlay) existingOverlay.remove();
 
   const overlay = document.createElement('div');
   overlay.id = 'autofill-filling-overlay';
@@ -232,17 +298,39 @@ function createFillingOverlay() {
 
   overlay.innerHTML = `
     <div class="autofill-content-modal">
+      <button id="autofill-cancel-btn" style="
+        position: absolute; 
+        top: 15px; 
+        right: 15px; 
+        background: none; 
+        border: none; 
+        font-size: 20px; 
+        cursor: pointer; 
+        color: #888;
+        z-index: 10;
+      ">✕</button>
+      
       <div class="autofill-content-spinner"></div>
       <h3 class="autofill-content-title">🤖 AutoFill AI en cours</h3>
-      <p class="autofill-content-description">Veuillez patienter pendant que nous remplissons automatiquement le formulaire...</p>
+      <p class="autofill-content-description">Remplissage automatique du formulaire...</p>
       
-      <div id="filling-progress" class="autofill-content-progress">
-        <div id="progress-bar" class="autofill-content-progress-bar" style="width: 0%;"></div>
+      <div class="autofill-progress-section">
+        <p class="autofill-progress-label">👤 Remplissage du profil</p>
+        <div id="filling-progress" class="autofill-content-progress">
+          <div id="progress-bar" class="autofill-content-progress-bar" style="width: 0%;"></div>
+        </div>
+        <p id="filling-progress-text" class="autofill-content-progress-text">0 / 0 champs remplis</p>
       </div>
-      
+
+      <div id="ai-progress-section" class="autofill-progress-section" style="display: none;">
+        <p class="autofill-progress-label">🤖 Génération IA</p>
+        <div id="ai-filling-progress" class="autofill-content-progress">
+          <div id="ai-progress-bar" class="autofill-content-progress-bar" style="width: 0%; background: linear-gradient(90deg, #3b82f6, #6366f1) !important;"></div>
+        </div>
+        <p id="ai-filling-status" class="autofill-content-status">En attente...</p>
+      </div>
+
       <p id="filling-status" class="autofill-content-status">Initialisation...</p>
-      
-      <p id="filling-progress-text" class="autofill-content-progress-text">0 / 0 champs remplis</p>
       
       <div class="autofill-content-tip">
         <p>💡 <strong>Astuce:</strong> Ne modifiez pas le formulaire pendant le remplissage automatique.</p>
@@ -251,95 +339,80 @@ function createFillingOverlay() {
   `;
 
   document.body.appendChild(overlay);
+
+  document.getElementById('autofill-cancel-btn').addEventListener('click', () => {
+    isFillingCancelled = true;
+    if (aiAbortController) aiAbortController.abort();
+    updateFillingProgress('Remplissage annulé par l\'utilisateur.');
+    removeFillingOverlay();
+  });
   
-  // Prevent all interaction with the page content
+  // Prevent interaction with page content
   overlay.addEventListener('click', (e) => e.stopPropagation());
   overlay.addEventListener('mousedown', (e) => e.stopPropagation());
   overlay.addEventListener('keydown', (e) => e.stopPropagation());
   overlay.addEventListener('touchstart', (e) => e.stopPropagation(), { passive: false });
   overlay.addEventListener('wheel', (e) => e.preventDefault(), { passive: false });
   
-  // Prevent scrolling on the body when overlay is active
   document.body.style.overflow = 'hidden';
-  
-  // Force a reflow to ensure animations and transitions work correctly
   void overlay.offsetWidth;
 
   return overlay;
 }
 
 function updateFillingProgress(message, current = null, total = null) {
+  if (isFillingCancelled) return;
+  
   const statusElement = document.getElementById('filling-status');
   const progressBar = document.getElementById('progress-bar');
   const progressText = document.getElementById('filling-progress-text');
   
-  if (statusElement) {
-    statusElement.textContent = message;
-  }
+  if (statusElement) statusElement.textContent = message;
   
-  // Update progress text if provided
   if (current !== null && total !== null) {
     if (progressText) {
       progressText.textContent = `${current} / ${total} champs remplis`;
     }
-    // Update progress bar based on actual progress
     if (progressBar && total > 0) {
       const percentage = Math.min(100, Math.round((current / total) * 100));
       
-      // Force reflow and set width with explicit styling
       progressBar.offsetHeight;
       progressBar.style.cssText = `
         width: ${percentage}% !important;
         height: 100% !important;
-        background: linear-gradient(90deg, #4f46e5, #7c3aed) !important;
-        border-radius: 5px !important;
+        background: linear-gradient(90deg, #22c55e, #16a34a) !important;
+        border-radius: 4px !important;
         transition: width 0.4s cubic-bezier(0.25, 1, 0.5, 1) !important;
-      `;
-    }
-  } else {
-    // Fallback for messages without explicit progress numbers
-    if (progressBar) {
-      let percentage = 10; // Default starting point
-      if (message.includes('Préparation')) percentage = 10;
-      if (message.includes('Remplissage')) percentage = 40;
-      if (message.includes('succès')) percentage = 100;
-      if (message.includes('Erreur')) percentage = 0;
-      
-      // Force reflow and set width with explicit styling
-      progressBar.offsetHeight;
-      progressBar.style.cssText = `
-        width: ${percentage}% !important;
-        height: 100% !important;
-        background: linear-gradient(90deg, #4f46e5, #7c3aed) !important;
-        border-radius: 5px !important;
-        transition: width 0.4s cubic-bezier(0.25, 1, 0.5, 1) !important;
+        display: block !important;
       `;
     }
   }
 }
 
-function removeFillingOverlay() {
-  const overlay = document.getElementById('autofill-filling-overlay');
-  if (overlay) {
-    // Restore body scrolling
-    document.body.style.overflow = '';
-    
-    // Fade out animation
-    overlay.style.opacity = '0';
-    overlay.style.transition = 'opacity 0.3s ease';
-    setTimeout(() => {
-      if (overlay.parentNode) {
-        overlay.remove();
-      }
-    }, 300);
+function updateAIProgress(message, percentage) {
+  if (isFillingCancelled) return;
+  
+  const aiSection = document.getElementById('ai-progress-section');
+  const aiStatus = document.getElementById('ai-filling-status');
+  const aiProgressBar = document.getElementById('ai-progress-bar');
+
+  if (aiSection) aiSection.style.display = 'block';
+  if (aiStatus) aiStatus.textContent = message;
+  if (aiProgressBar) {
+    aiProgressBar.offsetHeight;
+    aiProgressBar.style.cssText = `
+      width: ${percentage}% !important;
+      height: 100% !important;
+      background: linear-gradient(90deg, #3b82f6, #6366f1) !important;
+      border-radius: 4px !important;
+      transition: width 0.4s cubic-bezier(0.25, 1, 0.5, 1) !important;
+      display: block !important;
+    `;
   }
 }
 
-// Add autofill styles to the page
 function addAutofillStyles() {
-  if (document.getElementById('autofill-styles')) {
-    return; // Already added
-  }
+  if (document.getElementById('autofill-styles')) return;
   
   const styles = document.createElement('style');
   styles.id = 'autofill-styles';
@@ -352,6 +425,44 @@ function addAutofillStyles() {
     .autofill-filled {
       background-color: #e8f5e8 !important;
       border-color: #22c55e !important;
+    }
+    .autofill-filled-ai {
+      background-color: #eef2ff !important;
+      border-color: #3b82f6 !important;
+    }
+    .autofill-progress-section {
+      margin: 15px 0 !important;
+      text-align: left !important;
+    }
+    .autofill-progress-label {
+      font-weight: 600 !important;
+      margin-bottom: 8px !important;
+      font-size: 14px !important;
+      color: #374151 !important;
+    }
+    .autofill-content-progress {
+      background: #e5e7eb !important;
+      height: 12px !important;
+      border-radius: 6px !important;
+      overflow: hidden !important;
+      margin: 8px 0 !important;
+      border: 1px solid #d1d5db !important;
+      position: relative !important;
+    }
+    .autofill-content-progress-bar {
+      height: 100% !important;
+      width: 0% !important;
+      border-radius: 6px !important;
+      transition: width 0.4s cubic-bezier(0.25, 1, 0.5, 1) !important;
+      display: block !important;
+      position: absolute !important;
+      top: 0 !important;
+      left: 0 !important;
+    }
+    .autofill-content-progress-text {
+      font-size: 12px !important;
+      color: #6b7280 !important;
+      margin: 4px 0 !important;
     }
     #autofill-filling-overlay {
       position: fixed !important;
@@ -376,9 +487,9 @@ function addAutofillStyles() {
       border-radius: 16px !important;
       box-shadow: 0 20px 60px rgba(0,0,0,0.4) !important;
       text-align: center !important;
-      max-width: 450px !important;
+      max-width: 520px !important;
       position: relative !important;
-      min-width: 350px !important;
+      min-width: 420px !important;
     }
     .autofill-content-spinner {
       width: 50px !important;
@@ -388,21 +499,6 @@ function addAutofillStyles() {
       border-radius: 50% !important;
       animation: spin 1s linear infinite !important;
       margin: 0 auto 24px auto !important;
-    }
-    .autofill-content-progress {
-      background: #e9ecef !important;
-      height: 10px !important;
-      border-radius: 5px !important;
-      overflow: hidden !important;
-      margin: 20px 0 !important;
-      border: 1px solid #dee2e6;
-    }
-    .autofill-content-progress-bar {
-      background: linear-gradient(90deg, #4f46e5, #7c3aed) !important;
-      height: 100% !important;
-      width: 0% !important;
-      border-radius: 5px !important;
-      transition: width 0.4s cubic-bezier(0.25, 1, 0.5, 1) !important;
     }
     @keyframes spin {
       0% { transform: rotate(0deg); }
@@ -417,7 +513,6 @@ function addAutofillStyles() {
   document.head.appendChild(styles);
 }
 
-// Initialize styles when content script loads
 addAutofillStyles();
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -436,24 +531,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
   if (message.action === "fillFormComplete") {
-    // Handle complete form filling process with overlay
-    handleCompleteFormFilling(message.formIndex, message.matchedFields, message.userProfile, message.totalFields);
+    handleCompleteFormFilling(message.formIndex, message.matchedFields, message.userProfile, message.totalFields, message.aiServerUrl);
     sendResponse({ success: true });
     return true;
   }
-  if (message.action === "showFillingOverlay") {
-    createFillingOverlay();
-    sendResponse({ success: true });
-    return true;
-  }
-  if (message.action === "updateFillingProgress") {
-    updateFillingProgress(message.message || message.status, message.current, message.total);
-    sendResponse({ success: true });
-    return true;
-  }
-  if (message.action === "hideFillingOverlay") {
-    removeFillingOverlay();
-    sendResponse({ success: true });
+  if (message.action === "getAISuggestions") {
+    handleAILogic(message.userProfile, message.aiRelevantFields, message.aiServerUrl)
+      .then(suggestions => sendResponse({ success: true, suggestions }))
+      .catch(error => sendResponse({ success: false, error: error.message }));
     return true;
   }
 });
@@ -461,14 +546,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 function fillFormWithSuggestions(formIndex, suggestions, isAIFilling = false) {
   const forms = document.querySelectorAll("form");
   if (formIndex >= forms.length) {
-    console.warn(`Form index ${formIndex} not found`);
     return;
   }
   
   const form = forms[formIndex];
   const formInputs = form.querySelectorAll("input, textarea, select");
-  
-  console.log(`Filling ${suggestions.length} suggestions (AI: ${isAIFilling})`);
   
   if (isAIFilling) {
     updateFillingProgress('🤖 Applying AI suggestions...');
@@ -484,7 +566,6 @@ function fillFormWithSuggestions(formIndex, suggestions, isAIFilling = false) {
     setTimeout(() => {
       let targetInput = null;
       
-      // Try multiple ways to find the target input
       targetInput = form.querySelector(`[name="${suggestion.field_name}"]`);
       if (!targetInput) {
         targetInput = form.querySelector(`#${suggestion.field_name}`);
@@ -504,7 +585,7 @@ function fillFormWithSuggestions(formIndex, suggestions, isAIFilling = false) {
         const source = suggestion.source === 'ai' ? '🤖 AI' : '👤 Profile';
         updateFillingProgress(`${source}: ${fieldLabel}...`);
         
-        // Fill the field based on its type
+        // Fill field based on type
         if (targetInput.tagName.toLowerCase() === 'select') {
           const options = Array.from(targetInput.options);
           const exactMatch = options.find(option => 
@@ -540,13 +621,9 @@ function fillFormWithSuggestions(formIndex, suggestions, isAIFilling = false) {
           targetInput.classList.remove('autofill-filled');
         }, 2000);
         
-        console.log(`✅ Filled: ${fieldLabel} = "${suggestion.suggested_value}" (${suggestion.source})`);
         filledCount++;
-      } else {
-        console.warn(`❌ Could not find field: ${suggestion.field_name}`);
       }
       
-      // Update progress for the last suggestion
       if (index === suggestions.length - 1) {
         setTimeout(() => {
           const sourceText = isAIFilling ? '🤖 AI' : '👤 Profile';
@@ -558,24 +635,250 @@ function fillFormWithSuggestions(formIndex, suggestions, isAIFilling = false) {
   });
 }
 
-// Complete form filling function that handles the entire process
-async function handleCompleteFormFilling(formIndex, matchedFields, userProfile, totalFields) {
+// AI logic handler
+async function handleAILogic(userProfile, aiRelevantFields, aiServerUrl) {
+  if (isFillingCancelled) return { suggestions: [], timedOut: false };
+  
   try {
-    console.log('🎯 Starting complete form filling process in content script');
+    updateAIProgress('Envoi à l\'IA...', 50);
     
-    // Debug: Log the fields that were passed
-    console.log('📝 Received matched fields:', matchedFields.map(f => ({
-      name: f.field_name,
-      value: f.suggested_value,
-      matched: f.matched_profile_field
-    })));
+    const aiPayload = {
+      user_profile: {
+        firstName: userProfile.profile?.firstName || '',
+        lastName: userProfile.profile?.lastName || '',
+        email: userProfile.email || '',
+        dateOfBirth: userProfile.profile?.dateOfBirth || '',
+        gender: userProfile.profile?.gender || '',
+        phoneNumber: userProfile.profile?.phoneNumber || '',
+        address: userProfile.profile?.address || '',
+        city: userProfile.profile?.city || '',
+        country: userProfile.profile?.country || '',
+        postalCode: userProfile.profile?.postalCode || '',
+        hobbies: userProfile.profile?.hobbies || '',
+        linkedinUrl: userProfile.profile?.linkedinUrl || '',
+        githubUrl: userProfile.profile?.githubUrl || '',
+        portfolioUrl: userProfile.profile?.portfolioUrl || ''
+      },
+      fields: aiRelevantFields.map(field => ({
+        field_name: field.field_name,
+        field_type: field.field_info?.type || 'text',
+        field_label: field.field_info?.label || '',
+        field_placeholder: field.field_info?.placeholder || '',
+        field_required: field.field_info?.required || false
+      }))
+    };
     
-    // Create and show overlay
+    const response = await fetch(aiServerUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(aiPayload),
+      signal: aiAbortController?.signal
+    });
+    
+    if (!response.ok) {
+      throw new Error(`AI server returned error: ${response.status}`);
+    }
+    
+    const aiResults = await response.json();
+    updateAIProgress('Réponse IA reçue', 75);
+    
+    // Handle response format: [{'field_name': 'skills', 'suggested_value': '...'}]
+    let processedResults = [];
+    
+    if (Array.isArray(aiResults)) {
+      processedResults = aiResults;
+    } else if (aiResults && typeof aiResults === 'object') {
+      if (aiResults.suggestions && Array.isArray(aiResults.suggestions)) {
+        processedResults = aiResults.suggestions;
+      } else if (aiResults.data && Array.isArray(aiResults.data)) {
+        processedResults = aiResults.data;
+      } else if (aiResults.generated_suggestions && Array.isArray(aiResults.generated_suggestions)) {
+        processedResults = aiResults.generated_suggestions;
+      }
+    }
+    
+    const aiSuggestions = processedResults.map((result) => {
+      return {
+        field_name: result.field_name,
+        suggested_value: result.suggested_value,
+        field_info: aiRelevantFields.find(f => f.field_name === result.field_name)?.field_info,
+        matched_profile_field: 'ai_generated',
+        source: 'ai'
+      };
+    }).filter(suggestion => suggestion.suggested_value && suggestion.suggested_value.trim());
+    
+    updateAIProgress('Suggestions IA traitées', 100);
+    return { suggestions: aiSuggestions, timedOut: false };
+    
+  } catch (error) {
+    if (error.name === 'AbortError') {
+      return { suggestions: [], timedOut: false };
+    }
+    
+    console.error("AI suggestion error:", error.message);
+    if (error.message.includes('Failed to fetch') || error.message.includes('ERR_CONNECTION_REFUSED')) {
+      updateAIProgress('Serveur IA indisponible', 0);
+    } else {
+      updateAIProgress('Erreur IA, ignorer...', 0);
+    }
+    return { suggestions: [], timedOut: false, error: error };
+  }
+}
+
+// Field filling utilities
+function findFieldInForm(form, field) {
+  let targetInput = form.querySelector(`[name="${field.field_name}"]`);
+  if (!targetInput) targetInput = form.querySelector(`#${field.field_name}`);
+  
+  if (!targetInput && field.field_info) {
+    const { name, id, label, placeholder } = field.field_info;
+    const formInputs = form.querySelectorAll("input, textarea, select");
+    targetInput = Array.from(formInputs).find(input =>
+      (input.name && input.name === name) ||
+      (input.id && input.id === id) ||
+      (label && getFieldLabel(input) === label) ||
+      (placeholder && input.placeholder === placeholder)
+    );
+  }
+  
+  return targetInput;
+}
+
+function fillSingleField(targetInput, field, source) {
+  if (targetInput.tagName.toLowerCase() === 'select') {
+    const options = Array.from(targetInput.options);
+    const match = options.find(opt => 
+      opt.value.toLowerCase() === field.suggested_value.toLowerCase() ||
+      opt.text.toLowerCase() === field.suggested_value.toLowerCase()
+    );
+    if (match) targetInput.value = match.value;
+  } else if (targetInput.type === 'date' || field.matched_profile_field === 'dateOfBirth') {
+    // Handle date inputs specifically
+    let dateValue = field.suggested_value;
+    if (dateValue && !dateValue.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      const date = new Date(dateValue);
+      if (!isNaN(date.getTime())) {
+        dateValue = date.toISOString().split('T')[0];
+      }
+    }
+    targetInput.value = dateValue;
+  } else {
+    targetInput.value = field.suggested_value;
+  }
+
+  // Trigger events
+  ['input', 'change', 'blur'].forEach(eventType => {
+    targetInput.dispatchEvent(new Event(eventType, { bubbles: true }));
+  });
+
+  // Visual feedback
+  const filledClass = source === 'ai' ? 'autofill-filled-ai' : 'autofill-filled';
+  targetInput.classList.add(filledClass);
+  setTimeout(() => targetInput.classList.remove(filledClass), 2000);
+}
+
+function removeFillingOverlay() {
+  const overlay = document.getElementById('autofill-filling-overlay');
+  if (overlay) {
+    document.body.style.overflow = '';
+    overlay.style.opacity = '0';
+    overlay.style.transition = 'opacity 0.3s ease';
+    setTimeout(() => {
+      if (overlay.parentNode) {
+        overlay.remove();
+      }
+    }, 300);
+  }
+  
+  if (aiAbortController) {
+    aiAbortController = null;
+  }
+}
+
+async function fillProfileFields(form, profileFields) {
+  let successCount = 0;
+  
+  for (let i = 0; i < profileFields.length; i++) {
+    if (isFillingCancelled) break;
+    
+    const field = profileFields[i];
+    const progressFieldName = field.field_info?.label || field.field_info?.placeholder || field.field_name || `Champ ${i + 1}`;
+    
+    updateFillingProgress(`👤 Remplissage: ${progressFieldName}...`, i + 1, profileFields.length);
+    
+    const targetInput = findFieldInForm(form, field);
+    if (targetInput) {
+      fillSingleField(targetInput, field, 'profile');
+      successCount++;
+    }
+    
+    await new Promise(resolve => setTimeout(resolve, 200));
+  }
+  
+  updateFillingProgress(`👤 Profil terminé: ${successCount} champs`, profileFields.length, profileFields.length);
+  return successCount;
+}
+
+async function processAndFillAIFields(form, aiFields, userProfile, aiServerUrl) {
+  let successCount = 0;
+  
+  try {
+    if (aiFields.length === 0) return 0;
+    
+    updateAIProgress('🤖 Démarrage requête IA...', 15);
+    
+    const timeoutPromise = new Promise(resolve => 
+      setTimeout(() => resolve({ suggestions: [], timedOut: true }), 15000) 
+    );
+    
+    const aiPromise = handleAILogic(userProfile, aiFields, aiServerUrl);
+    
+    const aiResult = await Promise.race([aiPromise, timeoutPromise]).catch(err => {
+      updateAIProgress("IA indisponible", 0);
+      return { suggestions: [], timedOut: true, error: err };
+    });
+    
+    if (isFillingCancelled) return 0;
+    
+    if (aiResult.timedOut) {
+      updateAIProgress('⌛️ Délai IA dépassé', 0);
+      return 0;
+    } else if (aiResult.suggestions && aiResult.suggestions.length > 0) {
+      updateAIProgress('🤖 Application suggestions...', 90);
+      
+      // Fill AI fields
+      for (let i = 0; i < aiResult.suggestions.length; i++) {
+        if (isFillingCancelled) break;
+        
+        const field = aiResult.suggestions[i];
+        const targetInput = findFieldInForm(form, field);
+        if (targetInput) {
+          fillSingleField(targetInput, field, 'ai');
+          successCount++;
+        }
+        
+        await new Promise(resolve => setTimeout(resolve, 300));
+      }
+      
+      updateAIProgress(`🤖 IA terminée: ${successCount} champs`, 100);
+    } else if (aiResult.error) {
+      updateAIProgress('❌ Erreur IA', 0);
+    }
+  } catch (error) {
+    console.error('AI processing error:', error);
+    updateAIProgress('❌ Erreur IA', 0);
+  }
+  
+  return successCount;
+}
+
+// Main form filling orchestrator - parallel workflow
+async function handleCompleteFormFilling(formIndex, matchedFields, userProfile, totalFields, aiServerUrl) {
+  try {
     createFillingOverlay();
-    updateFillingProgress('Préparation du remplissage...', 0, totalFields);
-    
-    // Small delay to show the overlay
-    await new Promise(resolve => setTimeout(resolve, 500));
+    await new Promise(resolve => setTimeout(resolve, 300));
     
     const forms = document.querySelectorAll("form");
     if (formIndex >= forms.length) {
@@ -584,227 +887,29 @@ async function handleCompleteFormFilling(formIndex, matchedFields, userProfile, 
     
     const form = forms[formIndex];
     
-    // Fill fields one by one with progress updates
-    let successCount = 0;
-    let failedCount = 0;
-    const failedFields = [];
+    // Separate profile and AI fields
+    const profileFields = matchedFields.filter(f => f.source !== 'ai');
+    const aiFields = matchedFields.filter(f => f.source === 'ai');
     
-    for (let i = 0; i < matchedFields.length; i++) {
-      const field = matchedFields[i];
-      
-      try {
-        // Get a meaningful field name for progress display
-        const progressFieldName = field.field_info?.label || field.field_info?.placeholder || field.field_name || `Champ ${i + 1}`;
-        updateFillingProgress(`Remplissage: ${progressFieldName}...`, i, totalFields);
-        
-        // Find the target input with multiple fallback strategies
-        let targetInput = null;
-        let foundVia = '';
-        
-        try {
-          // Strategy 1: By name attribute
-          targetInput = form.querySelector(`[name="${field.field_name}"]`);
-          if (targetInput) foundVia = 'name';
-          
-          // Strategy 2: By ID
-          if (!targetInput) {
-            targetInput = form.querySelector(`#${field.field_name}`);
-            if (targetInput) foundVia = 'id';
-          }
-          
-          // Strategy 3: By field info properties
-          if (!targetInput && field.field_info) {
-            const fieldInfo = field.field_info;
-            const formInputs = form.querySelectorAll("input, textarea, select");
-            targetInput = Array.from(formInputs).find(input => {
-              return (
-                input.name === fieldInfo.name ||
-                input.id === fieldInfo.id ||
-                (fieldInfo.label && (getFieldLabel(input) === fieldInfo.label)) ||
-                (fieldInfo.placeholder && input.placeholder === fieldInfo.placeholder)
-              );
-            });
-            if (targetInput) foundVia = 'fieldInfo';
-          }
-        } catch (findError) {
-          console.warn(`❌ Error finding field ${field.field_name}:`, findError);
-          failedFields.push({ field: field.field_name, reason: 'field_not_found', error: findError.message });
-          failedCount++;
-          continue; // Skip to next field
-        }
-        
-        if (targetInput && field.suggested_value !== null && field.suggested_value !== undefined) {
-          try {
-            const fieldLabel = getFieldLabel(targetInput) || targetInput.name || targetInput.placeholder || 'field';
-            
-            // Fill the field based on its type and content with error handling
-            if (targetInput.tagName.toLowerCase() === 'select') {
-              // Handle select elements
-              try {
-                const options = Array.from(targetInput.options);
-                const matchingOption = options.find(option => 
-                  option.value.toLowerCase() === field.suggested_value.toLowerCase() ||
-                  option.text.toLowerCase() === field.suggested_value.toLowerCase()
-                );
-                if (matchingOption) {
-                  targetInput.value = matchingOption.value;
-                } else {
-                  throw new Error(`No matching option found for "${field.suggested_value}"`);
-                }
-              } catch (selectError) {
-                console.warn(`❌ Select field error for ${field.field_name}:`, selectError);
-                failedFields.push({ field: field.field_name, reason: 'select_option_not_found', error: selectError.message });
-                failedCount++;
-                continue;
-              }
-            } else if (targetInput.type === 'date' || field.matched_profile_field === 'dateOfBirth') {
-              // Handle date inputs specifically
-              try {
-                let dateValue = field.suggested_value;
-                
-                // If it's a date field but not in YYYY-MM-DD format, try to convert
-                if (dateValue && !dateValue.match(/^\d{4}-\d{2}-\d{2}$/)) {
-                  const date = new Date(dateValue);
-                  if (!isNaN(date.getTime())) {
-                    dateValue = date.toISOString().split('T')[0];
-                  } else {
-                    throw new Error(`Invalid date format: ${dateValue}`);
-                  }
-                }
-                
-                targetInput.value = dateValue;
-                console.log(`📅 Date field filled: ${fieldLabel} = "${dateValue}" (via: ${foundVia})`);
-              } catch (dateError) {
-                console.warn(`❌ Date field error for ${field.field_name}:`, dateError);
-                failedFields.push({ field: field.field_name, reason: 'date_format_error', error: dateError.message });
-                failedCount++;
-                continue;
-              }
-            } else {
-              // Handle input and textarea elements
-              try {
-                targetInput.value = field.suggested_value.toString();
-              } catch (inputError) {
-                console.warn(`❌ Input field error for ${field.field_name}:`, inputError);
-                failedFields.push({ field: field.field_name, reason: 'input_value_error', error: inputError.message });
-                failedCount++;
-                continue;
-              }
-            }
-            
-            // Trigger events to notify the page (with error handling)
-            try {
-              targetInput.dispatchEvent(new Event('input', { bubbles: true }));
-              targetInput.dispatchEvent(new Event('change', { bubbles: true }));
-              targetInput.dispatchEvent(new Event('blur', { bubbles: true }));
-            } catch (eventError) {
-              console.warn(`⚠️ Event dispatch warning for ${field.field_name}:`, eventError);
-              // Don't fail the field for event errors, just warn
-            }
-            
-            // Visual feedback (with error handling)
-            try {
-              targetInput.classList.add('autofill-filling');
-              setTimeout(() => {
-                try {
-                  targetInput.style.backgroundColor = '#e8f5e8';
-                  targetInput.style.transition = 'background-color 0.3s';
-                } catch (styleError) {
-                  console.warn(`⚠️ Style warning for ${field.field_name}:`, styleError);
-                }
-              }, 100);
-              setTimeout(() => {
-                try {
-                  targetInput.style.backgroundColor = '';
-                  targetInput.classList.remove('autofill-filling');
-                } catch (styleError) {
-                  console.warn(`⚠️ Style cleanup warning for ${field.field_name}:`, styleError);
-                }
-              }, 2000);
-            } catch (visualError) {
-              console.warn(`⚠️ Visual feedback warning for ${field.field_name}:`, visualError);
-              // Don't fail for visual feedback errors
-            }
-            
-            console.log(`✅ Filled: ${fieldLabel} = "${field.suggested_value}" (via: ${foundVia})`);
-            successCount++;
-            
-          } catch (fillError) {
-            console.warn(`❌ Failed to fill ${field.field_name}:`, fillError);
-            failedFields.push({ field: field.field_name, reason: 'fill_operation_failed', error: fillError.message });
-            failedCount++;
-          }
-        } else {
-          console.warn(`❌ Could not find field or value: ${field.field_name}`);
-          failedFields.push({ field: field.field_name, reason: 'field_or_value_missing' });
-          failedCount++;
-        }
-        
-        // Update progress with meaningful field name
-        const completedFieldName = field.field_info?.label || field.field_info?.placeholder || field.field_name || `Champ ${i + 1}`;
-        updateFillingProgress(`Rempli: ${completedFieldName}`, i + 1, totalFields);
-        
-        // Small delay for visual feedback (continue even if this fails)
-        try {
-          await new Promise(resolve => setTimeout(resolve, 300));
-        } catch (delayError) {
-          console.warn('⚠️ Delay warning:', delayError);
-        }
-        
-      } catch (outerError) {
-        console.error(`❌ Unexpected error processing field ${field.field_name}:`, outerError);
-        failedFields.push({ field: field.field_name, reason: 'unexpected_error', error: outerError.message });
-        failedCount++;
-      }
-    }
+    updateFillingProgress('🚀 Démarrage remplissage parallèle...', 0, profileFields.length);
     
-    // Show completion
-    updateFillingProgress(`Formulaire rempli avec succès! ${successCount}/${totalFields} champs`, totalFields, totalFields);
+    // Start both processes simultaneously
+    const profilePromise = fillProfileFields(form, profileFields);
+    const aiPromise = processAndFillAIFields(form, aiFields, userProfile, aiServerUrl);
     
-    // Auto-remove overlay after showing completion
-    setTimeout(() => {
-      removeFillingOverlay();
-    }, 2500);
+    // Wait for both to complete
+    const [profileSuccessCount, aiSuccessCount] = await Promise.all([profilePromise, aiPromise]);
     
-    console.log(`🎉 Form filling completed! Filled ${successCount}/${totalFields} fields`);
+    if (isFillingCancelled) return;
     
-    // Log summary of failed fields if any
-    if (failedCount > 0) {
-      console.warn(`⚠️ ${failedCount} fields failed to fill:`, failedFields);
-    }
+    const totalSuccess = profileSuccessCount + aiSuccessCount;
+    updateFillingProgress(`✅ Formulaire rempli! ${totalSuccess}/${totalFields} champs (👤${profileSuccessCount} + 🤖${aiSuccessCount})`, totalFields, totalFields);
+    
+    setTimeout(removeFillingOverlay, 2500);
     
   } catch (error) {
-    console.error('❌ Form filling error:', error);
-    updateFillingProgress('Erreur lors du remplissage du formulaire', 0, totalFields);
-    
-    // Remove overlay after error
-    setTimeout(() => {
-      removeFillingOverlay();
-    }, 3000);
+    console.error('Form filling error:', error);
+    updateFillingProgress('❌ Erreur lors du remplissage', 0, totalFields);
+    setTimeout(removeFillingOverlay, 3000);
   }
-}
-
-// Debug function to log field details
-function logFieldDebugInfo(fields, userProfile) {
-  console.log('🔍 Debug: All detected fields:', fields.map(f => ({
-    name: f.name,
-    label: f.label,
-    type: f.type,
-    placeholder: f.placeholder
-  })));
-  
-  // Check specifically for potential birth date fields
-  const potentialBirthFields = fields.filter(f => {
-    const identifiers = [f.label, f.name, f.placeholder].filter(Boolean).map(s => s.toLowerCase());
-    return identifiers.some(id => 
-      id.includes('birth') || id.includes('naissance') || id.includes('age') || 
-      id.includes('âge') || id.includes('né') || id.includes('born')
-    );
-  });
-  
-  if (potentialBirthFields.length > 0) {
-    console.log('🎂 Potential birth date fields found:', potentialBirthFields);
-  }
-  
-  console.log('👤 User profile birth date:', userProfile.profile?.dateOfBirth);
 }

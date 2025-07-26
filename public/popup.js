@@ -9,7 +9,6 @@ import { FIELD_MAPPINGS } from './utils/constants.js';
 import { handleLogin, handleRegister, handleProfileSubmit, handleLogout } from './manager/authHandler.js';
 import { detectForms, displayDetectedForms, fillForm } from './manager/formHandler.js';
 import { loadCountries } from './manager/dropdownHandler.js';
-import { getAISuggestions } from './manager/aiHandler.js';
 import { showTab, toggleSection, showAuthSection, showProfileSection, showUserSection, hideAllSections, showMessage, clearMessages, displayMessage } from './utils/domUtils.js';
 
 class PopupManager {
@@ -149,7 +148,6 @@ class PopupManager {
         document.getElementById('toggleStartupSectionBtn').addEventListener('click', () => {
             toggleSection('startup');
         });
-        // Remove detect forms button listener since we auto-load
         document.getElementById('loginTabBtn').addEventListener('click', () => {
             showTab('login');
         });
@@ -311,13 +309,40 @@ class PopupManager {
             if (response && response.forms && response.forms.length > 0) {
                 this.displayDetectedForms(response.forms);
             } else {
-                // If no cached forms, show a message or refresh detection
-                const container = document.getElementById('formsContainer');
-                container.innerHTML = '<p class="no-forms-popup-message">No forms detected on this page.</p>';
+                const detectResponse = await chrome.tabs.sendMessage(tab.id, { action: 'detectForms' });
+                if (detectResponse && detectResponse.forms && detectResponse.forms.length > 0) {
+                    this.displayDetectedForms(detectResponse.forms);
+                } else {
+                    const container = document.getElementById('formsContainer');
+                    container.innerHTML = `
+                        <div class="no-forms-message">
+                            <p class="no-forms-text">No forms detected on this page.</p>
+                            <p class="reload-message">Please reload the page to detect forms.</p>
+                            <button id="refreshFormsBtn" class="btn btn-secondary">🔄 Try Again</button>
+                        </div>
+                    `;
+                    
+                    document.getElementById('refreshFormsBtn').addEventListener('click', () => {
+                        this.loadDetectedForms();
+                    });
+                }
             }
         } catch (error) {
             const container = document.getElementById('formsContainer');
-            container.innerHTML = '<p class="forms-error-message">Unable to detect forms. Please refresh the page.</p>';
+            container.innerHTML = `
+                <div class="no-forms-message">
+                    <p class="forms-error-message">Unable to connect to the page.</p>
+                    <p class="reload-message">Please reload the page to detect forms.</p>
+                    <button id="refreshFormsBtn" class="btn btn-secondary">🔄 Try Again</button>
+                </div>
+            `;
+            
+            const refreshBtn = document.getElementById('refreshFormsBtn');
+            if (refreshBtn) {
+                refreshBtn.addEventListener('click', () => {
+                    this.loadDetectedForms();
+                });
+            }
         }
     }
 }
